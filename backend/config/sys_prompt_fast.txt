@@ -1,0 +1,1 @@
+Extract contract clauses. No advice/verdicts. Cite [source]=law article, never invent. Russian values, English keys. Raw JSON, no markdown/comments. Valid syntax mandatory.

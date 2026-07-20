@@ -1,0 +1,25 @@
+# Django system
+django
+djangorestframework
+django-cors-headers
+
+# Special system
+environ
+cryptography
+
+# OAuth
+django-allauth
+dj-rest-auth
+djangorestframework-simplejwt
+
+# PostgreSQL
+psycopg2-binary
+django-environ
+
+# Logic tools
+packaging
+PyMuPDF
+chromadb
+sentence-transformers
+groq
+llama-cpp-python

@@ -1,0 +1,10 @@
+**/.venv/
+**/.tests/
+
+.env
+*.gguf
+
+_trash/
+
+**/__pycache__/
+**/law_db/
