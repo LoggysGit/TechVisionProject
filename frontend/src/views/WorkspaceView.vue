@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import Footer from '../components/Footer.vue'
 import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 
+const backendAPI = 'http://127.0.0.1:8000/'
+
 const pastAnalyses = ref([])
 
 const selectedFile = ref(null)
@@ -37,11 +39,17 @@ function closeModal() {
   isModalOpen.value = false
 }
 
+const targetName = ref('')
+
 async function submitAnalysis() {
   const file = selectedFile.value
-  if (!file) return
+  const name = targetName.value.trim()
+
+  if (!file || !name) return
 
   console.log(`[Censorer] File selected: ${file.name}`)
+  console.log(`[Target Name]: ${name}`)
+
   const extractor = new ExtractorService()
   const anonymizer = new Anonymizer()
 
@@ -53,15 +61,17 @@ async function submitAnalysis() {
     anonymizer.reset()
     const secureText = anonymizer.process(rawText)
 
+    const preprocessedText = `Человек, от лица которого необходимо рассматривать документ: ${name}.\nДОКУМЕНТ:\n${secureText}`
+
     // 2. Send
-    const response = await fetch('http://yurtadotsafe-api.loca.lt/api/analyze/', {
+    const response = await fetch(`${backendAPI}/api/analyze/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         user_id: 0,
-        content: secureText
+        content: preprocessedText
       })
     })
 
@@ -142,6 +152,7 @@ const detectionPoints = [
         <div class="upload-block">
           <h2 class="section__title">Загрузите ваш договор (PDF / PNG)</h2>
 
+          <!-- Dropzone -->
           <div
             class="dropzone"
             :class="{ 'dropzone--active': isDragging, 'dropzone--filled': fileLabel }"
@@ -166,16 +177,30 @@ const detectionPoints = [
             <p v-else class="dropzone__filename">{{ fileLabel }}</p>
           </div>
 
+          <!-- Name input -->
+          <div class="input-block">
+            <label for="target-name" class="input-label">Целевое ФИО:</label>
+            <input
+              id="target-name"
+              v-model="targetName"
+              type="text"
+              class="text-input"
+              placeholder="Например: Иванов Иван Иванович"
+            />
+          </div>
+
+          <!-- Submit -->
           <button
             type="button"
             class="submit-btn"
-            :disabled="!fileLabel || isLoading"
+            :disabled="!fileLabel || !targetName.trim() || isLoading"
             @click="submitAnalysis"
           >
             {{ isLoading ? 'Анализируем...' : 'Проверить договор' }}
           </button>
         </div>
 
+        <!-- Detection Panel -->
         <aside class="detection-panel">
           <h3 class="detection-panel__title">Что мы ищем в договоре:</h3>
 
@@ -225,6 +250,7 @@ const detectionPoints = [
   flex-direction: column;
 }
 
+/* BG */
 .backdrop {
   position: absolute;
   top: 0;
@@ -240,15 +266,23 @@ const detectionPoints = [
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.55;
+  opacity: 0.25; 
+  filter: blur(8px) scale(1.05);
 }
 
 .backdrop-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(155, 232, 108, 0.65) 0%, rgba(155, 232, 108, 0.95) 100%);
+  background: linear-gradient(
+    180deg, 
+    rgba(113, 113, 113, 0.5) 0%,
+    rgba(155, 232, 108, 0.1) 30%,
+    rgba(155, 232, 108, 0.85) 50%,
+    rgba(155, 232, 108, 1) 100%
+  );
 }
 
+/* Topbar */
 .topbar,
 .content {
   position: relative;
@@ -265,7 +299,7 @@ const detectionPoints = [
 }
 
 .logo-img {
-  height: 160px;
+  height: 96px;
   width: auto;
   display: inline-block;
   margin: 0;
@@ -279,7 +313,6 @@ const detectionPoints = [
   flex-grow: 1;
 }
 
-/* Без подчеркиваний */
 .section__title {
   font-family: var(--font-display, 'Montserrat', sans-serif);
   font-weight: 700;
@@ -289,7 +322,7 @@ const detectionPoints = [
   margin: 0 0 20px;
 }
 
-/* ---------- Прошлые анализы ---------- */
+/* Previous */
 .history-list {
   display: flex;
   flex-direction: column;
@@ -341,7 +374,7 @@ const detectionPoints = [
   box-sizing: border-box;
 }
 
-/* ---------- Загрузка договора ---------- */
+/* Dropfield */
 .section--split {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
@@ -399,6 +432,48 @@ const detectionPoints = [
   word-break: break-word;
 }
 
+/* Name input */
+.input-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.input-label {
+  font-family: var(--font-display, 'Montserrat', sans-serif);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--bg-deep);
+}
+
+.text-input {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: var(--text-primary);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bg-deep);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.text-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.text-input:focus {
+  border-color: var(--bg-panel);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+}
+
+/* Submit Btn */
 .submit-btn {
   align-self: flex-start;
   margin-top: 20px;
@@ -423,7 +498,7 @@ const detectionPoints = [
   opacity: 0.9;
 }
 
-/* ---------- Панель детекции ---------- */
+/* Detection panel */
 .detection-panel {
   display: flex;
   flex-direction: column;
@@ -462,7 +537,7 @@ const detectionPoints = [
   font-size: 13px;
 }
 
-/* ---------- Модальное окно результатов ---------- */
+/* Modal result overlay */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -521,7 +596,7 @@ const detectionPoints = [
 
 .modal-body {
   padding: 24px 28px;
-  overflow-y: auto; /* Внутренний скролл */
+  overflow-y: auto;
   flex-grow: 1;
 }
 
@@ -538,7 +613,7 @@ const detectionPoints = [
   margin: 0;
 }
 
-/* ---------- Responsive ---------- */
+/* Responsive */
 @media (max-width: 860px) {
   .section--split {
     grid-template-columns: 1fr;
