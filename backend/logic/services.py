@@ -538,7 +538,6 @@ class AIService:
         print(" > [AI] All retries exhausted.")
         return None
 
-
 class DocumentProcessor:
     def __init__(self):
         print(" > [DocProcessor] Init started.")
