@@ -1,17 +1,24 @@
 <script setup>
 import { ref, computed } from 'vue'
-import Footer from '../components/Footer.vue'
+import { unref, toRaw } from 'vue'
+
 import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 
+import Footer from '../components/Footer.vue'
+import ReportModal from '@/components/ReportModal.vue'
+
+// === Global section === //
 const backendAPI = 'http://127.0.0.1:8000/'
 
 const pastAnalyses = ref([])
 
+// === File select code section === //
 const selectedFile = ref(null)
 const isDragging = ref(false)
 const fileInput = ref(null)
 
 const acceptedTypes = ['.pdf', '.png', '.jpg', '.jpeg']
+
 
 function openFilePicker() {
   /* Select file */
@@ -33,6 +40,7 @@ function handleDrop(event) {
   if (file) selectedFile.value = file
 }
 
+// === History === //
 function updateHistory() {
   /* Reads local storage, loads all & updates UI */
   try {
@@ -43,34 +51,93 @@ function updateHistory() {
   }
 }
 
-function saveAnalysis(name, result) {
-  /* Save result with name and report payload */
+function saveAnalysis(title, result) {
+  /* Saves analysis result to local storage history */
   try {
-    const history = JSON.parse(localStorage.getItem('analysis_history') || '[]');
-    history.push({
-      title: name,
-      report: result,
+    // 1. Validate input data
+    if (!result) return;
+
+    // 2. Unwrap Vue reactive proxies
+    let raw = unref(toRaw(result));
+    let parsedResult = raw;
+    const targetString = raw?.result ?? raw;
+
+    // 3. Parse JSON string if applicable
+    if (typeof targetString === 'string') {
+      try {
+        parsedResult = JSON.parse(targetString);
+      } catch (e) {
+        parsedResult = { rawText: targetString };
+      }
+    }
+
+    // 4. Strip reactivity
+    const cleanData = cloneCleanObject(parsedResult);
+    const cleanTitle = String(unref(title) || 'Contract Analysis');
+
+    // 5. Get existing history from storage
+    const historyRaw = localStorage.getItem('analysis_history') || '[]';
+    let history = [];
+    try {
+      history = JSON.parse(historyRaw);
+    } catch (e) {
+      history = [];
+    }
+
+    // 6. Push new entry to history
+    const newEntry = {
+      title: cleanTitle,
+      report: cleanData,
       timestamp: new Date().toISOString()
-    });
+    };
+    history.push(newEntry);
+
+    // 7. Persist updated history array
     localStorage.setItem('analysis_history', JSON.stringify(history));
-    
-    updateHistory();
-  } catch (e) {
-    console.error("Failed to save analysis to localStorage", e);
+
+    console.log('Analysis saved to history successfully');
+
+    // 8. Trigger local UI update callback
+    if (typeof updateHistory === 'function') {
+      updateHistory();
+    }
+  }
+  catch (e) {
+    console.error("Failed to save analysis history", e);
   }
 }
 
+function cloneCleanObject(obj) {
+  /* Strips Vue reactivity props from object */
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => cloneCleanObject(item));
+  }
+
+  const clean = {};
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith('__v_') || key === 'dep' || key === 'effect' || key === '_value') {
+      continue;
+    }
+    clean[key] = cloneCleanObject(obj[key]);
+  }
+  return clean;
+}
+
+// === Main frontend logic === //
 const fileLabel = computed(() => selectedFile.value?.name || null)
 
 const isLoading = ref(false)
 const isModalOpen = ref(false)
 
-const result = ref(null)
-
 const selectedReport = ref(null)
 
 function closeModal() {
   isModalOpen.value = false
+  console.log(isModalOpen)
 }
 
 const targetName = ref('')
@@ -117,16 +184,12 @@ async function submitAnalysis() {
     console.log('[Backend]:', backendData)
 
     // 3. Get & Open Modal
-    result.value = {
-      raw: rawText,
-      secure: secureText,
-      analysis: backendData
-    }
-
-    selectedReport = result
+    selectedReport.value = backendData
     isModalOpen.value = true
 
-    saveAnalysis(fileLabel, result)
+    console.log(`Selected report: ${selectedReport.value}`)
+
+    saveAnalysis(fileLabel, backendData)
 
   } catch (error) {
     console.error('File error:', error)
@@ -135,7 +198,12 @@ async function submitAnalysis() {
   }
 }
 
-// UI Points
+function selectReport(rep){
+  selectedReport.value = rep.report;
+  isModalOpen.value = true;
+}
+
+// === UI Points === //
 const detectionPoints = [
   {
     title: 'Финансовые риски',
@@ -151,6 +219,7 @@ const detectionPoints = [
   },
 ]
 
+// === Start === //
 document.addEventListener("DOMContentLoaded", () => {
   updateHistory();
 });
@@ -181,10 +250,7 @@ document.addEventListener("DOMContentLoaded", () => {
             v-for="(item, index) in pastAnalyses" 
             :key="item.id || index" 
             class="history-item"
-            @click="selectedReport = item.report; isModalOpen = true"
-            role="button"
-            tabindex="0"
-            @keydown.enter="selectedReport = item.report; isModalOpen = true"
+            @click="selectReport(item)"
           >
             <span class="history-item__number">{{ index + 1 }}.</span>
             <span class="history-item__title">{{ item.title }}</span>
@@ -264,33 +330,11 @@ document.addEventListener("DOMContentLoaded", () => {
     </main>
 
     <!-- Modal Window for Results -->
-    <Teleport to="body">
-      <div v-if="isModalOpen" class="modal-overlay" @click.self="closeModal">
-        <div class="modal-container" role="dialog" aria-modal="true">
-          <header class="modal-header">
-            <h2 class="modal-title">Результат анализа договора</h2>
-            <button type="button" class="modal-close" @click="closeModal" aria-label="Закрыть">
-              ✕
-            </button>
-          </header>
-
-          <div class="modal-body">
-            <div v-if="selectedReport && selectedReport.findings" class="result-content">
-              <div v-for="(item, index) in selectedReport.findings" :key="index" class="finding-card" :class="'finding--' + item.category">
-                <div class="finding-header">
-                  <span class="clause-badge">Пункт {{ item.clause_ref }}</span>
-                  <span class="category-badge">{{ item.category }}</span>
-                </div>
-                <blockquote class="finding-excerpt">«{{ item.excerpt }}»</blockquote>
-                <p class="finding-explanation"><strong>Суть:</strong> {{ item.explanation }}</p>
-                <p class="finding-source"><strong>Закон/Источник:</strong> {{ item.source }}</p>
-                <p v-if="item.mitigation" class="finding-mitigation"><strong>Рекомендация:</strong> {{ item.mitigation }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <ReportModal 
+      :is-open="isModalOpen" 
+      :report-data="selectedReport" 
+      @close="closeModal()" 
+    />
 
     <Footer />
   </div>
