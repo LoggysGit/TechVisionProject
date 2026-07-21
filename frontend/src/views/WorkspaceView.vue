@@ -14,26 +14,60 @@ const fileInput = ref(null)
 const acceptedTypes = ['.pdf', '.png', '.jpg', '.jpeg']
 
 function openFilePicker() {
+  /* Select file */
   fileInput.value?.click()
 }
 
 function handleFileChange(event) {
+  /* Handle file change */
   const file = event.target.files?.[0]
   if (file) selectedFile.value = file
 }
 
 function handleDrop(event) {
+  /* Handle file drop */
   event.preventDefault()
   isDragging.value = false
+
   const file = event.dataTransfer.files?.[0]
   if (file) selectedFile.value = file
+}
+
+function updateHistory() {
+  /* Reads local storage, loads all & updates UI */
+  try {
+    pastAnalyses.value = JSON.parse(localStorage.getItem('analysis_history') || '[]');
+    console.log("History loaded:", pastAnalyses.value);
+  } catch (e) {
+    console.error("Failed to load history from localStorage", e);
+  }
+}
+
+function saveAnalysis(name, result) {
+  /* Save result with name and report payload */
+  try {
+    const history = JSON.parse(localStorage.getItem('analysis_history') || '[]');
+    history.push({
+      title: name,
+      report: result,
+      timestamp: new Date().toISOString()
+    });
+    localStorage.setItem('analysis_history', JSON.stringify(history));
+    
+    updateHistory();
+  } catch (e) {
+    console.error("Failed to save analysis to localStorage", e);
+  }
 }
 
 const fileLabel = computed(() => selectedFile.value?.name || null)
 
 const isLoading = ref(false)
 const isModalOpen = ref(false)
+
 const result = ref(null)
+
+const selectedReport = ref(null)
 
 function closeModal() {
   isModalOpen.value = false
@@ -42,6 +76,7 @@ function closeModal() {
 const targetName = ref('')
 
 async function submitAnalysis() {
+  /* Submit file analysis */
   const file = selectedFile.value
   const name = targetName.value.trim()
 
@@ -78,7 +113,6 @@ async function submitAnalysis() {
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`)
     }
-
     const backendData = await response.json()
     console.log('[Backend]:', backendData)
 
@@ -88,7 +122,11 @@ async function submitAnalysis() {
       secure: secureText,
       analysis: backendData
     }
+
+    selectedReport = result
     isModalOpen.value = true
+
+    saveAnalysis(fileLabel, result)
 
   } catch (error) {
     console.error('File error:', error)
@@ -112,17 +150,21 @@ const detectionPoints = [
     text: 'Обратим внимание на нетипичные обязанности и потенциальные риски.',
   },
 ]
+
+document.addEventListener("DOMContentLoaded", () => {
+  updateHistory();
+});
 </script>
 
 <template>
   <div class="page">
-    <!-- Background with Overlay & bg_workspace.jpeg -->
+    <!-- Background -->
     <div class="backdrop" aria-hidden="true">
       <img src="../assets/bg_workspace.jpeg" alt="" class="backdrop-img" />
       <div class="backdrop-overlay"></div>
     </div>
 
-    <!-- Topbar: Logo Left -->
+    <!-- Topbar -->
     <header class="topbar">
       <router-link to="/" class="logo" aria-label="Yurta.safe">
         <img src="../assets/logo.png" alt="YURTA.safe" class="logo-img" />
@@ -135,10 +177,18 @@ const detectionPoints = [
         <h2 class="section__title">Ваши прошлые анализы:</h2>
 
         <ul v-if="pastAnalyses.length" class="history-list">
-          <li v-for="(item, index) in pastAnalyses" :key="item.id" class="history-item">
+          <li 
+            v-for="(item, index) in pastAnalyses" 
+            :key="item.id || index" 
+            class="history-item"
+            @click="selectedReport = item.report; isModalOpen = true"
+            role="button"
+            tabindex="0"
+            @keydown.enter="selectedReport = item.report; isModalOpen = true"
+          >
             <span class="history-item__number">{{ index + 1 }}.</span>
             <span class="history-item__title">{{ item.title }}</span>
-            <span class="history-item__date">{{ item.date }}</span>
+            <!--span class="history-item__date">{{ item.date || new Date(item.timestamp).toLocaleDateString() }}</span-->
           </li>
         </ul>
 
@@ -160,9 +210,6 @@ const detectionPoints = [
             @dragleave.prevent="isDragging = false"
             @drop="handleDrop"
             @click="openFilePicker"
-            role="button"
-            tabindex="0"
-            @keydown.enter="openFilePicker"
           >
             <input
               ref="fileInput"
@@ -228,8 +275,17 @@ const detectionPoints = [
           </header>
 
           <div class="modal-body">
-            <div v-if="result" class="result-content">
-              <pre>{{ result.secure }}</pre>
+            <div v-if="selectedReport && selectedReport.findings" class="result-content">
+              <div v-for="(item, index) in selectedReport.findings" :key="index" class="finding-card" :class="'finding--' + item.category">
+                <div class="finding-header">
+                  <span class="clause-badge">Пункт {{ item.clause_ref }}</span>
+                  <span class="category-badge">{{ item.category }}</span>
+                </div>
+                <blockquote class="finding-excerpt">«{{ item.excerpt }}»</blockquote>
+                <p class="finding-explanation"><strong>Суть:</strong> {{ item.explanation }}</p>
+                <p class="finding-source"><strong>Закон/Источник:</strong> {{ item.source }}</p>
+                <p v-if="item.mitigation" class="finding-mitigation"><strong>Рекомендация:</strong> {{ item.mitigation }}</p>
+              </div>
             </div>
           </div>
         </div>

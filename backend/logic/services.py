@@ -18,7 +18,6 @@ from llama_cpp import Llama
 
 import core.settings as settings
 
-
 class LawRetriever:
     def __init__(self):
         print(" > [LawRetriever] Init started.")
@@ -246,10 +245,8 @@ class LawRetriever:
         except Exception as e:
             print(f" > [Law index] Failed to write to DB: {e}")
 
-
 class CensorshipError(Exception):
     """ Error catcher """
-
 
 class AIService:
     def __init__(self):
@@ -485,20 +482,19 @@ class AIService:
             return None
 
         user_message = (
-            f"ЗАКОН (English source; cite exact Article number in 'source' for every finding):\n"
-            f"{law_context}\n\n"
-            f"ДОГОВОР:\n"
-            f"{document_text}\n\n"
-            f"---\n"
-            f"Пройди договор пункт за пунктом. Для каждого пункта с обязательством, правом, риском "
-            f"или дедлайном создай отдельный объект findings - не объединяй разные пункты в один.\n\n"
-            f"Правила поля 'source':\n"
-            f"- Обязательно укажи конкретный номер статьи из блока ЗАКОН.\n"
-            f"- Если ни одна статья не применима - напиши 'не найдено в предоставленном законе'.\n"
-            f"- Никогда не придумывай номер статьи.\n\n"
-            f"Если документ не относится к жилищному праву (EULA или другой тип) - верни {{\"findings\": []}}.\n\n"
-            f"Формат каждого объекта в findings:\n{schema_str}\n\n"
-            f"Верни строго JSON: {{\"findings\": [ ... ]}}"
+            f"ЗАКОН (exact Article in 'source'):\n{law_context}\n\n"
+            f"ДОГОВОР:\n{document_text}\n\n---\n"
+            f"Пройди договор пункт за пунктом. Для каждого обязательства, права, риска, дедлайна — отдельный объект findings (не объединяй).\n\n"
+            f"Правила 'source':\n"
+            f"- Точный номер статьи из ЗАКОНА.\n"
+            f"- Иначе: 'не найдено в предоставленном законе'.\n"
+            f"- Не выдумывай статьи.\n\n"
+            f"Правила 'mitigation':\n"
+            f"- Для категории 'risk' — ЗАПОЛНИ ОБЯЗАТЕЛЬНО.\n"
+            f"- Для остальных категорий — желательно предлагать улучшение.\n\n"
+            f"Если не жилищное право — верни {{\"findings\": []}}.\n\n"
+            f"Формат:\n{schema_str}\n\n"
+            f"Строго JSON: {{\"findings\": [ ... ]}}"
         )
 
         try:
