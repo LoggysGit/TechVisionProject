@@ -41,6 +41,36 @@ function handleDrop(event) {
 }
 
 // === History === //
+function formatDate(isoString) {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  return date.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
+function cloneCleanObject(obj) {
+  /* Strips Vue reactivity props from object */
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => cloneCleanObject(item));
+  }
+
+  const clean = {};
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith('__v_') || key === 'dep' || key === 'effect' || key === '_value') {
+      continue;
+    }
+    clean[key] = cloneCleanObject(obj[key]);
+  }
+  return clean;
+}
+
 function updateHistory() {
   /* Reads local storage, loads all & updates UI */
   try {
@@ -48,6 +78,14 @@ function updateHistory() {
     console.log("History loaded:", pastAnalyses.value);
   } catch (e) {
     console.error("Failed to load history from localStorage", e);
+  }
+}
+
+function clearHistory() {
+  if (confirm('Вы уверены, что хотите полностью очистить историю анализов?')) {
+    localStorage.removeItem('analysis_history')
+    pastAnalyses.value = []
+    updateHistory()
   }
 }
 
@@ -105,26 +143,6 @@ function saveAnalysis(title, result) {
   catch (e) {
     console.error("Failed to save analysis history", e);
   }
-}
-
-function cloneCleanObject(obj) {
-  /* Strips Vue reactivity props from object */
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => cloneCleanObject(item));
-  }
-
-  const clean = {};
-  for (const key of Object.keys(obj)) {
-    if (key.startsWith('__v_') || key === 'dep' || key === 'effect' || key === '_value') {
-      continue;
-    }
-    clean[key] = cloneCleanObject(obj[key]);
-  }
-  return clean;
 }
 
 // === Main frontend logic === //
@@ -214,6 +232,10 @@ const detectionPoints = [
     text: 'Проверим правила выселения и порядок уведомления о прекращении договора.',
   },
   {
+    title: 'Ответственность и ремонт',
+    text: 'Разберем, кто платит за поломки, коммунальные услуги и форс-мажорные ситуации.',
+  },
+  {
     title: 'И другие спорные пункты',
     text: 'Обратим внимание на нетипичные обязанности и потенциальные риски.',
   },
@@ -243,8 +265,22 @@ document.addEventListener("DOMContentLoaded", () => {
     <main class="content">
       <!-- History -->
       <section class="section">
-        <h2 class="section__title">Ваши прошлые анализы:</h2>
+        <div class="section__header">
+          <h2 class="section__title">Ваши прошлые анализы:</h2>
 
+          <!-- Clear history -->
+          <button 
+            v-if="pastAnalyses.length" 
+            type="button" 
+            class="clear-btn" 
+            @click="clearHistory"
+            title="Очистить всю историю"
+          >
+            <span class="clear-btn__icon">🗑️</span>
+            <span class="clear-btn__text">Очистить историю</span>
+          </button>
+        </div>
+      
         <ul v-if="pastAnalyses.length" class="history-list">
           <li 
             v-for="(item, index) in pastAnalyses" 
@@ -254,10 +290,12 @@ document.addEventListener("DOMContentLoaded", () => {
           >
             <span class="history-item__number">{{ index + 1 }}.</span>
             <span class="history-item__title">{{ item.title }}</span>
-            <!--span class="history-item__date">{{ item.date || new Date(item.timestamp).toLocaleDateString() }}</span-->
+            <span v-if="item.timestamp || item.date" class="history-item__date">
+              {{ item.date || formatDate(item.timestamp) }}
+            </span>
           </li>
         </ul>
-
+      
         <p v-else class="empty-state">
           Здесь появятся ваши прошлые анализы, как только вы загрузите первый договор.
         </p>
@@ -422,11 +460,46 @@ document.addEventListener("DOMContentLoaded", () => {
   margin: 0 0 20px;
 }
 
-/* Previous */
+.section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+/* Clear history button */
+.clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--text-primary);
+  border: 1px solid var(--line);
+  color: var(--bg-deep);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: var(--bg-deep);
+  transform: translateY(-1px);
+}
+
+.clear-btn__icon {
+  font-size: 14px;
+}
+
+/* History list */
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -436,39 +509,62 @@ document.addEventListener("DOMContentLoaded", () => {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 18px 28px;
+  padding: 16px 24px;
   border-radius: 999px;
+  
   background: var(--text-primary);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  border: 3px solid var(--line);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  
   font-family: var(--font-display, 'Montserrat', sans-serif);
-  font-weight: 700;
+  font-weight: 600;
+  color: var(--bg-deep);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  background: var(--text-muted);
+  border-color: var(--lime);
+  color: var(--bg-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+.history-item:hover .history-item__number,
+.history-item:hover .history-item__date {
   color: var(--bg-deep);
 }
 
 .history-item__number {
   flex-shrink: 0;
-  color: var(--bg-panel);
+  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .history-item__title {
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .history-item__date {
   flex-shrink: 0;
   font-weight: 500;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
+/* Empty State */
 .empty-state {
-  padding: 24px 28px;
-  border-radius: 20px;
+  padding: 20px 24px;
+  border-radius: 16px;
   background: var(--text-primary);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--line);
   color: var(--text-muted);
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   width: 100%;
   box-sizing: border-box;
