@@ -315,7 +315,7 @@ const redirect = (pageName) => {
 .btn-start .arrow { transition: transform 0.2s ease; }
 .btn-start:hover .arrow { transform: translateX(5px); }
 
-/* Adaptive */
+/* Responsive */
 @media (max-width: 992px) {
   .hero-content { grid-template-columns: 1fr; gap: 40px; }
   .how-layout { grid-template-columns: 1fr; gap: 40px; }

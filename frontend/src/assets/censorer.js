@@ -1,9 +1,8 @@
-import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
+import { createWorker } from 'tesseract.js'
 
-const { createWorker } = Tesseract;
-
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  new URL('./node_modules/pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 export class ExtractorService {
   async extractText(file) {

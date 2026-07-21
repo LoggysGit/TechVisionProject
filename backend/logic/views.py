@@ -1,16 +1,21 @@
 """ Logic views """
 
 import json
-
-from django.shortcuts import render
-
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-
 from logic import services
 
 @csrf_exempt
 def analyze(request):
+    # 1. CORS preflight
+    if request.method == 'OPTIONS':
+        response = JsonResponse({}, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type"
+        return response
+
+    # 2. Method check
     if request.method != 'POST':
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
@@ -27,7 +32,17 @@ def analyze(request):
 
         # Update Report DB (NOT NOW)
 
-        return JsonResponse({"status": "ok", "user_id": user_id, "result": res})
+        # 3. Form & Send
+        response = JsonResponse({"user_id": user_id, "result": res}, status=200)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
 
     except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
+        response = JsonResponse({"error": "Invalid JSON"}, status=400)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
+    except Exception as e:
+        response = JsonResponse({"error": str(e)}, status=500)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
