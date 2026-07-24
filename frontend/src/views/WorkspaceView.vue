@@ -5,7 +5,10 @@ import { unref, toRaw } from 'vue'
 import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 
 import Footer from '../components/Footer.vue'
+import Background from '@/components/Background.vue'
 import ReportModal from '@/components/ReportModal.vue'
+
+import BGImage from '../assets/bg_workspace.jpeg'
 
 // === Global section === //
 const backendAPI = 'http://127.0.0.1:8000/'
@@ -250,10 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
 <template>
   <div class="page">
     <!-- Background -->
-    <div class="backdrop" aria-hidden="true">
-      <img src="../assets/bg_workspace.jpeg" alt="" class="backdrop-img" />
-      <div class="backdrop-overlay"></div>
-    </div>
+    <Background :image-src='BGImage' />
 
     <!-- Topbar -->
     <header class="topbar">
@@ -304,7 +304,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <!-- Load & Info -->
       <section class="section section--split">
         <div class="upload-block">
-          <h2 class="section__title">Загрузите ваш договор (PDF / PNG)</h2>
+          <h2 class="section__title">Загрузите ваш договор</h2>
 
           <!-- Dropzone -->
           <div
@@ -379,47 +379,6 @@ document.addEventListener("DOMContentLoaded", () => {
 </template>
 
 <style scoped>
-.page {
-  position: relative;
-  min-height: 100vh;
-  background-color: var(--lime);
-  color: var(--bg-deep);
-  display: flex;
-  flex-direction: column;
-}
-
-/* BG */
-.backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.backdrop-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.25; 
-  filter: blur(8px) scale(1.05);
-}
-
-.backdrop-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg, 
-    rgba(113, 113, 113, 0.5) 0%,
-    rgba(155, 232, 108, 0.1) 30%,
-    rgba(155, 232, 108, 0.85) 50%,
-    rgba(155, 232, 108, 1) 100%
-  );
-}
-
 /* Topbar */
 .topbar,
 .content {
@@ -455,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
   font-family: var(--font-display, 'Montserrat', sans-serif);
   font-weight: 700;
   font-size: 24px;
-  color: var(--bg-deep);
+  color: var(--text-primary);
   text-decoration: none;
   margin: 0 0 20px;
 }
@@ -472,15 +431,15 @@ document.addEventListener("DOMContentLoaded", () => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--text-primary);
+  background: var(--bg-panel);
   border: 1px solid var(--line);
-  color: var(--bg-deep);
+  color: var(--text-muted);
   padding: 8px 16px;
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition: all 0.2s ease;
 }
 
@@ -512,33 +471,33 @@ document.addEventListener("DOMContentLoaded", () => {
   padding: 16px 24px;
   border-radius: 999px;
   
-  background: var(--text-primary);
-  border: 3px solid var(--line);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   
   font-family: var(--font-display, 'Montserrat', sans-serif);
   font-weight: 600;
-  color: var(--bg-deep);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .history-item:hover {
-  background: var(--text-muted);
+  background: var(--bg-panel);
   border-color: var(--lime);
-  color: var(--bg-deep);
+  color: var(--lime);
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 18px rgba(155, 232, 108, 0.15);
 }
 
 .history-item:hover .history-item__number,
 .history-item:hover .history-item__date {
-  color: var(--bg-deep);
+  color: var(--lime);
 }
 
 .history-item__number {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--lime);
   font-weight: 700;
 }
 
@@ -561,7 +520,7 @@ document.addEventListener("DOMContentLoaded", () => {
 .empty-state {
   padding: 20px 24px;
   border-radius: 16px;
-  background: var(--text-primary);
+  background: var(--bg-panel);
   border: 1px solid var(--line);
   color: var(--text-muted);
   font-weight: 500;
@@ -591,20 +550,22 @@ document.addEventListener("DOMContentLoaded", () => {
   justify-content: center;
   padding: 24px;
   border-radius: 28px;
-  background: var(--text-primary);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  background: var(--bg-panel);
+  border: 2px dashed var(--line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   text-align: center;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: all 0.2s ease;
 }
 
-.dropzone:focus-visible {
-  outline: 3px solid var(--bg-panel);
-  outline-offset: 3px;
+.dropzone:focus-visible,
+.dropzone:hover {
+  border-color: var(--lime);
 }
 
 .dropzone--active {
-  box-shadow: 0 0 0 3px var(--bg-panel);
+  border-color: var(--lime);
+  background: var(--lime-dim);
   transform: scale(1.01);
 }
 
@@ -622,7 +583,7 @@ document.addEventListener("DOMContentLoaded", () => {
 }
 
 .dropzone__filename {
-  color: var(--bg-panel);
+  color: var(--lime);
   font-weight: 700;
   margin: 0;
   word-break: break-word;
@@ -640,20 +601,20 @@ document.addEventListener("DOMContentLoaded", () => {
   font-family: var(--font-display, 'Montserrat', sans-serif);
   font-weight: 700;
   font-size: 14px;
-  color: var(--bg-deep);
+  color: var(--text-primary);
 }
 
 .text-input {
   width: 100%;
   padding: 14px 20px;
   border-radius: 16px;
-  border: 2px solid transparent;
-  background: var(--text-primary);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
   font-family: inherit;
   font-size: 15px;
   font-weight: 600;
-  color: var(--bg-deep);
+  color: var(--text-primary);
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -665,8 +626,8 @@ document.addEventListener("DOMContentLoaded", () => {
 }
 
 .text-input:focus {
-  border-color: var(--bg-panel);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+  border-color: var(--lime);
+  box-shadow: 0 0 12px var(--lime-dim);
 }
 
 /* Submit Btn */
@@ -676,22 +637,23 @@ document.addEventListener("DOMContentLoaded", () => {
   padding: 14px 32px;
   border: none;
   border-radius: 999px;
-  background: var(--bg-panel);
-  color: var(--text-primary);
+  background: var(--lime);
+  color: var(--bg-deep);
   font-family: inherit;
   font-weight: 700;
   font-size: 16px;
   cursor: pointer;
-  transition: opacity 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .submit-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .submit-btn:not(:disabled):hover {
-  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px var(--lime-dim);
 }
 
 /* Detection panel */
@@ -706,7 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
   font-family: var(--font-display, 'Montserrat', sans-serif);
   font-weight: 800;
   font-size: 20px;
-  color: var(--bg-panel);
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
@@ -714,20 +676,21 @@ document.addEventListener("DOMContentLoaded", () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--text-primary);
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
   padding: 16px 20px;
   border-radius: 18px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
 }
 
 .detection-item__title {
-  color: var(--bg-panel);
+  color: var(--lime);
   font-weight: 800;
   font-size: 15px;
 }
 
 .detection-item__text {
-  color: var(--bg-deep);
+  color: var(--text-muted);
   font-weight: 500;
   line-height: 1.4;
   font-size: 13px;
@@ -738,7 +701,7 @@ document.addEventListener("DOMContentLoaded", () => {
   position: fixed;
   inset: 0;
   z-index: 999;
-  background: rgba(18, 14, 30, 0.7);
+  background: rgba(18, 14, 30, 0.85);
   backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
@@ -747,13 +710,14 @@ document.addEventListener("DOMContentLoaded", () => {
 }
 
 .modal-container {
-  background: var(--text-primary);
-  color: var(--bg-deep);
+  background: var(--bg-panel);
+  color: var(--text-primary);
   width: 100%;
   max-width: 800px;
   max-height: 85vh;
   border-radius: 28px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -772,7 +736,7 @@ document.addEventListener("DOMContentLoaded", () => {
   font-size: 20px;
   font-weight: 700;
   margin: 0;
-  color: var(--bg-panel);
+  color: var(--lime);
 }
 
 .modal-close {
@@ -780,14 +744,15 @@ document.addEventListener("DOMContentLoaded", () => {
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: var(--bg-deep);
+  color: var(--text-muted);
   line-height: 1;
   padding: 4px 8px;
   border-radius: 8px;
 }
 
 .modal-close:hover {
-  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary);
+  background: var(--line);
 }
 
 .modal-body {
@@ -799,11 +764,11 @@ document.addEventListener("DOMContentLoaded", () => {
 .result-content pre {
   white-space: pre-wrap;
   word-break: break-word;
-  background: rgba(28, 22, 48, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--bg-deep);
+  border: 1px solid var(--line);
   padding: 16px;
   border-radius: 16px;
-  color: var(--bg-deep);
+  color: var(--text-primary);
   font-family: monospace;
   font-size: 14px;
   margin: 0;

@@ -1,5 +1,8 @@
 <script setup>
 import Footer from '@/components/Footer.vue';
+import Background from '@/components/Background.vue';
+
+import BGImage from '../assets/bg.jpeg'
 
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -32,10 +35,7 @@ const redirect = (pageName) => {
 <template>
   <div class="page">
     <!-- Background -->
-    <div class="backdrop" aria-hidden="true">
-      <img src="../assets/bg.jpeg" alt="" class="backdrop-img" />
-      <div class="backdrop-overlay"></div>
-    </div>
+    <Background :image-src='BGImage' />
 
     <header class="topbar">
       <!-- Logo -->
@@ -106,25 +106,7 @@ const redirect = (pageName) => {
 </template>
 
 <style scoped>
-/* BG with gradient*/
-.backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-}
-.backdrop-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.7;
-}
-.backdrop-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(18,14,30,0.6) 0%, rgba(18,14,30,0.95) 100%);
-}
-
+/* Topbar */
 .topbar, main, .site-footer {
   position: relative;
   z-index: 1;
