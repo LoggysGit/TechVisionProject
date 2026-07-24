@@ -4,11 +4,12 @@ import { unref, toRaw } from 'vue'
 
 import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 
+import Header from '@/components/Header.vue'
 import Footer from '../components/Footer.vue'
 import Background from '@/components/Background.vue'
 import ReportModal from '@/components/ReportModal.vue'
 
-import BGImage from '../assets/bg_workspace.jpeg'
+import BGImage from '../assets/images/bg_workspace.jpeg'
 
 // === Global section === //
 const backendAPI = 'http://127.0.0.1:8000/'
@@ -21,7 +22,6 @@ const isDragging = ref(false)
 const fileInput = ref(null)
 
 const acceptedTypes = ['.pdf', '.png', '.jpg', '.jpeg']
-
 
 function openFilePicker() {
   /* Select file */
@@ -244,7 +244,7 @@ const detectionPoints = [
   },
 ]
 
-// === Start === //
+// === Event listeners & Setup === //
 document.addEventListener("DOMContentLoaded", () => {
   updateHistory();
 });
@@ -255,12 +255,8 @@ document.addEventListener("DOMContentLoaded", () => {
     <!-- Background -->
     <Background :image-src='BGImage' />
 
-    <!-- Topbar -->
-    <header class="topbar">
-      <router-link to="/" class="logo" aria-label="Yurta.safe">
-        <img src="../assets/logo.png" alt="YURTA.safe" class="logo-img" />
-      </router-link>
-    </header>
+    <!-- Header -->
+    <Header padding="24px" logo-height="96px" logoAlign="left" />
 
     <main class="content">
       <!-- History -->
@@ -388,18 +384,6 @@ document.addEventListener("DOMContentLoaded", () => {
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
-}
-
-.topbar {
-  padding: 24px clamp(20px, 6vw, 72px) 0;
-  text-align: left;
-}
-
-.logo-img {
-  height: 96px;
-  width: auto;
-  display: inline-block;
-  margin: 0;
 }
 
 .content {

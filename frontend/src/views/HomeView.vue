@@ -1,10 +1,10 @@
 <script setup>
+import Header from '@/components/Header.vue'
 import Footer from '@/components/Footer.vue';
 import Background from '@/components/Background.vue';
 
-import BGImage from '../assets/bg.jpeg'
+import BGImage from '../assets/images/bg.jpeg'
 
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -28,7 +28,8 @@ const steps = [
 ]
 
 const redirect = (pageName) => {
-  router.push({ name: pageName }) 
+  const routeData = router.resolve({ name: pageName })
+  window.location.href = routeData.href
 }
 </script>
 
@@ -37,23 +38,17 @@ const redirect = (pageName) => {
     <!-- Background -->
     <Background :image-src='BGImage' />
 
-    <header class="topbar">
-      <!-- Logo -->
-      <a href="#" class="logo" aria-label="Yurta.safe">
-        <img src="../assets/logo.png" alt="YURTA.safe" class="logo-img" />
-      </a>
-    </header>
+    <!-- Header -->
+    <Header padding="40px" logo-height="200px" logoAlign="center" />
 
     <main>
-      <!-- HEADER -->
+      <!-- Hero -->
       <section class="hero-header">
         <h1>Проверь договор аренды за 10 секунд без юристов и слива данных</h1>
         <hr class="accent-line" />
       </section>
 
-      <!-- HERO BLOCK -->
       <section class="hero-content">
-        <!-- Left: Note -->
         <div class="hero-card">
           <div class="card-binders">
             <span class="ring"></span><span class="ring"></span><span class="ring"></span>
@@ -63,7 +58,6 @@ const redirect = (pageName) => {
           </p>
         </div>
 
-        <!-- Right: Description -->
         <div class="hero-description">
           <h2 class="brand-title">Yurta.safe —</h2>
           <p class="lead">
@@ -100,13 +94,13 @@ const redirect = (pageName) => {
       </section>
     </main>
 
-    <!-- FOOTER -->
+    <!-- Footer -->
     <Footer />
   </div>
 </template>
 
 <style scoped>
-/* Topbar */
+/* Header local style */
 .topbar, main, .site-footer {
   position: relative;
   z-index: 1;
@@ -116,23 +110,12 @@ const redirect = (pageName) => {
   box-sizing: border-box;
 }
 
-.topbar {
-  padding: 16px clamp(20px, 6vw, 72px) 0;
-  text-align: center;
-}
-
-.logo-img {
-  height: 200px; 
-  width: auto;
-  display: block;
-  margin: 0 auto -5% auto; 
-}
-
-/* Header */
+/* Hero */
 .hero-header {
   padding: 50px 0;
   text-align: center;
 }
+
 .hero-header h1 {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
@@ -143,6 +126,7 @@ const redirect = (pageName) => {
   max-width: 900px;
   text-transform: uppercase;
 }
+
 .accent-line {
   border: none;
   height: 2px;
@@ -152,7 +136,6 @@ const redirect = (pageName) => {
   box-shadow: 0 0 10px rgba(155, 232, 108, 0.4);
 }
 
-/* Hero */
 .hero-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -171,6 +154,7 @@ const redirect = (pageName) => {
   box-shadow: 0 20px 40px rgba(0,0,0,0.5);
   transform: rotate(-1deg);
 }
+
 .card-binders {
   position: absolute;
   top: 15px;
@@ -180,6 +164,7 @@ const redirect = (pageName) => {
   justify-content: center;
   gap: 40px;
 }
+
 .ring {
   width: 12px;
   height: 24px;
@@ -189,6 +174,7 @@ const redirect = (pageName) => {
   box-shadow: none;
   transform: translateY(-20px);
 }
+
 .card-text {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
@@ -205,6 +191,7 @@ const redirect = (pageName) => {
   color: var(--lime);
   margin: 0 0 16px;
 }
+
 .lead {
   font-size: 1.1rem;
   line-height: 1.6;
@@ -217,6 +204,7 @@ const redirect = (pageName) => {
 .how {
   padding: 40px clamp(20px, 6vw, 72px) 80px;
 }
+
 .section-title {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 2rem;
@@ -238,6 +226,7 @@ const redirect = (pageName) => {
   flex-direction: column;
   gap: 24px;
 }
+
 .step-row {
   display: flex;
   align-items: flex-start;
@@ -247,6 +236,7 @@ const redirect = (pageName) => {
   border-radius: 12px;
   border: 1px solid var(--line);
 }
+
 .step-number {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 3.5rem;
@@ -255,11 +245,13 @@ const redirect = (pageName) => {
   line-height: 0.8;
   text-shadow: 0 0 20px rgba(155, 232, 108, 0.2);
 }
+
 .step-content {
   font-size: 1.05rem;
   line-height: 1.5;
   color: var(--text-primary);
 }
+
 .step-label {
   color: var(--lime);
   font-weight: 700;
@@ -273,6 +265,7 @@ const redirect = (pageName) => {
   display: flex;
   justify-content: center;
 }
+
 .btn-start {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
@@ -289,11 +282,13 @@ const redirect = (pageName) => {
   transition: all 0.2s ease;
   box-shadow: 0 0 20px rgba(155, 232, 108, 0.15);
 }
+
 .btn-start:hover {
   background: var(--lime);
   box-shadow: 0 0 30px rgba(155, 232, 108, 0.4);
   transform: translateY(-2px);
 }
+
 .btn-start .arrow { transition: transform 0.2s ease; }
 .btn-start:hover .arrow { transform: translateX(5px); }
 
@@ -303,6 +298,7 @@ const redirect = (pageName) => {
   .how-layout { grid-template-columns: 1fr; gap: 40px; }
   .action-panel { justify-content: flex-start; }
 }
+
 @media (max-width: 600px) {
   .hero-header h1 { font-size: 1.5rem; }
   .step-row { flex-direction: column; gap: 12px; }
