@@ -1,3 +1,3 @@
-from django.test import TestCase
+""" Logic tests """
 
-# Create your tests here.
+from django.test import TestCase

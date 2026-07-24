@@ -5,7 +5,7 @@ import { unref, toRaw } from 'vue'
 import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 
 import Header from '@/components/Header.vue'
-import Footer from '../components/Footer.vue'
+import Footer from '"@"/components/Footer.vue'
 import Background from '@/components/Background.vue'
 
 import ReportModal from '@/components/ReportModal.vue'

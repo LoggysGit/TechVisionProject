@@ -53,6 +53,8 @@ class LawRetriever:
             ) from e
 
     def _compress_document(self, doc_text: str, query_embedding: list, max_chars: int = 800) -> str:
+        """ Compresses document into vectors """
+
         # Split document on part
         try:
             header, sep, body = doc_text.partition("\n")
@@ -105,6 +107,8 @@ class LawRetriever:
             return doc_text
 
     def find_relevant_articles(self, document_text: str, top_k: int = 5, max_chars_per_article: int = 800) -> str:
+        """ Finds relevan articles by meaning """
+
         print(f" > [LawRetriever] Searching top_k={top_k} articles.")
 
         # Encode query
@@ -145,6 +149,8 @@ class LawRetriever:
     # - Build law index function - #
     @staticmethod
     def extract_law_text(pdf_path: str) -> str:
+        """ Extracts law text from law PDF """
+
         print(f" > [LawRetriever] Extracting text from {pdf_path}.")
         try:
             doc = fitz.open(pdf_path)
@@ -171,7 +177,11 @@ class LawRetriever:
 
     @staticmethod
     def split_into_articles(text: str) -> dict:
+        """ Splits text into articles with RegEx """
+
         print(" > [LawRetriever] Splitting text into articles.")
+
+        # Cleanup
         try:
             text = re.sub(r'[ \t]+', ' ', text)
             text = re.sub(r'\n{2,}', '\n', text)
@@ -179,6 +189,7 @@ class LawRetriever:
             print(f" > [LawRetriever] Text cleanup failed: {e}")
             return {}
 
+        # RegEx match
         try:
             pattern = r'Article\s*(\d+(?:-\d+)?)\.\s*([^\n]*)\n(.*?)(?=Article\s*\d+(?:-\d+)?\.|\Z)'
             matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
@@ -186,6 +197,7 @@ class LawRetriever:
             print(f" > [LawRetriever] Regex match failed: {e}")
             return {}
 
+        # Extract articles
         articles = {}
         for num, title, content in matches:
             try:
@@ -205,6 +217,8 @@ class LawRetriever:
 
     @staticmethod
     def build_law_index():
+        """ Builds law index """
+
         print(" > [Law index] Build started.")
 
         raw_text = LawRetriever.extract_law_text(settings.LAW_PDF_PATH)
@@ -326,6 +340,7 @@ class AIService:
             print(f"\n > [AIService] Model downloading error: {e}.")
             raise e
 
+    # - Setters - #
     def _set_mode(self, mode: str):
         print(f" > [AIService] Setting mode: {mode}.")
         if mode not in settings.GROQ_MODELS:
@@ -333,6 +348,7 @@ class AIService:
             raise ValueError(f"Unknown mode: {mode}.")
         self.active_mode = mode
 
+    # - Getters - #
     def _get_analyzer_system_prompt(self) -> str:
         sys_prompt_path = os.path.join(self.config_dir, f"sys_prompt_{self.active_mode}.txt")
         print(f" > [AIService] Reading analyzer prompt: {sys_prompt_path}.")
@@ -378,8 +394,62 @@ class AIService:
                 raise
         return self._local_llm
 
+    # - Internal functions - #
+    def _apply_censor_replacements(self, text: str, entities: list) -> str:
+        """ Applies censor replacements: Found entities replace with placeholders """
+
+        print(" > [Censor] Applying replacements.")
+        try:
+            flat_occurrences = []
+
+            valid_types = ("ФИО", "АДРЕС", "КОМПАНИЯ")
+
+            for entity in entities:
+                try:
+                    mask = entity.get("mask")
+                    entity_type = entity.get("type")
+                    forms = entity.get("forms", [])
+
+                    if not mask or entity_type not in valid_types or not forms:
+                        print(f" > [Censor] Skipped invalid entity: {entity!r}")
+                        continue
+
+                    for form in forms:
+                        if not isinstance(form, str) or not form.strip():
+                            continue
+                        flat_occurrences.append((form, mask))
+
+                except Exception as e:
+                    print(f" > [Censor] Skipped damaged entity {entity!r}: {e}")
+                    continue
+
+            print(f" > [Censor] {len(flat_occurrences)} occurrences to replace.")
+
+            # Long phrases first
+            flat_occurrences.sort(key=lambda pair: len(pair[0]), reverse=True)
+
+            for occurrence, mask in flat_occurrences:
+                try:
+                    if occurrence not in text:
+                        print(f" > [Censor] Not found: {occurrence!r}")
+                        continue
+                    text = text.replace(occurrence, mask)
+                    print(f" > [Censor] Replaced {occurrence!r} with {mask!r}.")
+
+                except Exception as e:
+                    print(f" > [Censor] Failed to replace {occurrence!r}: {e}")
+                    continue
+
+            print(f" > [Censor] Censored version: {text}")
+            return text
+
+        except Exception as e:
+            print(f" > [Censor] Fatal error during censoring, returning original text: {e}")
+            return text
+
+    # - Public functions - #
     def censor(self, raw: str) -> str:
-        """ Name, adress, company, subscription -> Placeholders """
+        """ Full censor function. Censors special elements: name, adress, company, subscription """
 
         print(" > [Censor] Censoring started.")
 
@@ -438,63 +508,13 @@ class AIService:
             raise CensorshipError(f" > [Censor] Invalid JSON: {raw_output!r}") from e
 
         try:
-            return self.apply_censor_replacements(raw, entities)
+            return self._apply_censor_replacements(raw, entities)
         except Exception as e:
             print(f" > [Censor] Replacement step crashed, returning original text: {e}")
             return raw
 
-    def apply_censor_replacements(self, text: str, entities: list) -> str:
-        print(" > [Censor] Applying replacements.")
-        try:
-            flat_occurrences = []
-
-            valid_types = ("ФИО", "АДРЕС", "КОМПАНИЯ")
-
-            for entity in entities:
-                try:
-                    mask = entity.get("mask")
-                    entity_type = entity.get("type")
-                    forms = entity.get("forms", [])
-
-                    if not mask or entity_type not in valid_types or not forms:
-                        print(f" > [Censor] Skipped invalid entity: {entity!r}")
-                        continue
-
-                    for form in forms:
-                        if not isinstance(form, str) or not form.strip():
-                            continue
-                        flat_occurrences.append((form, mask))
-
-                except Exception as e:
-                    print(f" > [Censor] Skipped damaged entity {entity!r}: {e}")
-                    continue
-
-            print(f" > [Censor] {len(flat_occurrences)} occurrences to replace.")
-
-            # Long phrases first
-            flat_occurrences.sort(key=lambda pair: len(pair[0]), reverse=True)
-
-            for occurrence, mask in flat_occurrences:
-                try:
-                    if occurrence not in text:
-                        print(f" > [Censor] Not found: {occurrence!r}")
-                        continue
-                    text = text.replace(occurrence, mask)
-                    print(f" > [Censor] Replaced {occurrence!r} with {mask!r}.")
-
-                except Exception as e:
-                    print(f" > [Censor] Failed to replace {occurrence!r}: {e}")
-                    continue
-
-            print(f" > [Censor] Censored version: {text}")
-            return text
-
-        except Exception as e:
-            print(f" > [Censor] Fatal error during censoring, returning original text: {e}")
-            return text
-
     def generate_analysis(self, report, mode: str = 'fast'):
-        """ Generate document analytics with AI API """
+        """ Generates document analytics with AI API """
 
         print(f" > [AI] Generating analysis in mode: {mode}.")
 
@@ -600,6 +620,7 @@ class DocumentProcessor:
 
     def _preprocess_file(self, file_text: str) -> dict:
         print(" > [DocProcessor] Preprocessing file.")
+
         try:
             preprocessed = self.ai_service.censor(file_text)
             print(" > [DocProcessor] Censoring done.")
@@ -610,6 +631,7 @@ class DocumentProcessor:
 
     def _main_process(self, user: dict, file_dict: dict) -> dict:
         print(" > [DocProcessor] Main process started.")
+
         try:
             used_model = "smart" if user["tier"] == "premium" else "fast"
         except Exception as e:
@@ -623,6 +645,8 @@ class DocumentProcessor:
             return None
 
     def analyze(self, text: str, user: dict) -> str:
+        """ Main document analyze cycle """
+
         print(" > [DocProcessor] Analyze called.")
 
         # Preprocess file

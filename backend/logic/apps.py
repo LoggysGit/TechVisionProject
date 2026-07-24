@@ -5,10 +5,14 @@ import sys
 from django.apps import AppConfig
 
 class LogicConfig(AppConfig):
+    """ Logic app config """
+
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'logic'
 
     def ready(self):
+        """ Executes on backend start """
+
         if 'runserver' not in sys.argv:
             return
 

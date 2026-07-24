@@ -1,3 +1,3 @@
-from django.contrib import admin
+""" Logic admin module """
 
-# Register your models here.
+from django.contrib import admin
