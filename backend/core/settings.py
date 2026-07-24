@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'logic.apps.LogicConfig',
 ]
 
 MIDDLEWARE = [
@@ -76,6 +77,8 @@ STATIC_URL = 'static/'
 
 # = Custom definitions = #
 LOGIC_CONF_DIR = BASE_DIR / 'config'
+
+LLM_DOWNLOAD_URL = "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf"
 
 LAW_DB_PATH = "..\\backend\\law_db\\"
 LAW_PDF_PATH = "..\\backend\\config\\law.pdf"

@@ -49,6 +49,7 @@
    ```bash
    cd backend
    python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
 
 3. **Скачайте необходимые инструменты бекенда**
 
@@ -60,6 +61,7 @@
    ```bash
    SECRET_KEY=your_django_secret_key
    DEBUG=True
+   ALLOWED_HOSTS=localhost,127.0.0.1
    GROQ_API_KEY=your_groq_api_key
 
 4. **Запустите бекенд (Фронтенд настроен на порт API бекенда 8000)**

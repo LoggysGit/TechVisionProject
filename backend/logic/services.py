@@ -10,6 +10,7 @@ import numpy as np
 
 import fitz
 import chromadb
+import urllib.request
 
 from sentence_transformers import SentenceTransformer
 from groq import Groq, RateLimitError, APIStatusError
@@ -19,8 +20,12 @@ from llama_cpp import Llama
 import core.settings as settings
 
 class LawRetriever:
+    """ Law index builder """
+
     def __init__(self):
         print(" > [LawRetriever] Init started.")
+
+        # Init embedder
         try:
             self.embedder = SentenceTransformer(settings.SEN_TRANSFORMER_MODEL, device='cpu')
             print(" > [LawRetriever] Embedder loaded.")
@@ -28,6 +33,7 @@ class LawRetriever:
             print(f" > [LawRetriever] Failed to load embedder: {e}")
             raise
 
+        # Init DB client
         try:
             self.db_client = chromadb.PersistentClient(path=settings.LAW_DB_PATH)
             print(" > [LawRetriever] DB client connected.")
@@ -35,6 +41,7 @@ class LawRetriever:
             print(f" > [LawRetriever] Failed to connect DB: {e}")
             raise
 
+        # Load DB data
         try:
             self.collection = self.db_client.get_collection("housing_law")
             print(" > [LawRetriever] Collection loaded.")
@@ -45,7 +52,7 @@ class LawRetriever:
                 f"Run LawRetriever.build_law_index() before use."
             ) from e
 
-    def find_relevant_articles(self, document_text, top_k=5, max_chars_per_article=800) -> str:
+    def find_relevant_articles(self, document_text: str, top_k: int = 5, max_chars_per_article: int = 800) -> str:
         print(f" > [LawRetriever] Searching top_k={top_k} articles.")
         try:
             query_embedding = self.embedder.encode(
@@ -124,7 +131,7 @@ class LawRetriever:
             return doc_text
 
     @staticmethod
-    def extract_law_text(pdf_path) -> str:
+    def extract_law_text(pdf_path: str) -> str:
         print(f" > [LawRetriever] Extracting text from {pdf_path}.")
         try:
             doc = fitz.open(pdf_path)
@@ -150,7 +157,7 @@ class LawRetriever:
         return text
 
     @staticmethod
-    def split_into_articles(text) -> dict:
+    def split_into_articles(text: str) -> dict:
         print(" > [LawRetriever] Splitting text into articles.")
         try:
             text = re.sub(r'[ \t]+', ' ', text)
@@ -185,9 +192,6 @@ class LawRetriever:
 
     @staticmethod
     def build_law_index():
-        """Rebuilds the ChromaDB collection from scratch — safe to call even
-        if the existing collection is missing or corrupted, since it doesn't
-        rely on __init__ having succeeded."""
         print(" > [Law index] Build started.")
 
         raw_text = LawRetriever.extract_law_text(settings.LAW_PDF_PATH)
@@ -249,8 +253,11 @@ class CensorshipError(Exception):
     """ Error catcher """
 
 class AIService:
+    """ AI tools & services class """
+
     def __init__(self):
         print(" > [AIService] Init started.")
+
         try:
             api_key = settings.GROQ_KEY
             self.client = Groq(api_key=api_key)
@@ -280,6 +287,31 @@ class AIService:
             "mitigation": "как переформулировать пункт по закону, или пустая строка если риска нет"
         }
         print(" > [AIService] Init done.")
+
+    @staticmethod
+    def download_local_model():
+        """ Checks & Downloads local LLM """
+
+        model_path = settings.CENSOR_MODEL
+
+        if os.path.exists(model_path):
+            print(f" > [AIService] Model exists on path {model_path}.")
+            return
+
+        print(f" > [AIService] Downloading local LLM...")
+
+        try:
+            urllib.request.urlretrieve(
+                settings.LLM_DOWNLOAD_URL,
+                model_path
+            )
+            print("\n > [AIService] Model downloaded.")
+
+        except Exception as e:
+            if os.path.exists(model_path):
+                os.remove(model_path)
+            print(f"\n > [AIService] Model downloading error: {e}.")
+            raise e
 
     def _set_mode(self, mode: str):
         print(f" > [AIService] Setting mode: {mode}.")
@@ -335,6 +367,7 @@ class AIService:
 
     def censor(self, raw: str) -> str:
         """ Name, adress, company, subscription -> Placeholders """
+
         print(" > [Censor] Censoring started.")
 
         try:
@@ -392,12 +425,12 @@ class AIService:
             raise CensorshipError(f" > [Censor] Invalid JSON: {raw_output!r}") from e
 
         try:
-            return self._apply_censor_replacements(raw, entities)
+            return self.apply_censor_replacements(raw, entities)
         except Exception as e:
             print(f" > [Censor] Replacement step crashed, returning original text: {e}")
             return raw
 
-    def _apply_censor_replacements(self, text: str, entities: list) -> str:
+    def apply_censor_replacements(self, text: str, entities: list) -> str:
         print(" > [Censor] Applying replacements.")
         try:
             flat_occurrences = []
@@ -448,6 +481,8 @@ class AIService:
             return text
 
     def generate_analysis(self, report, mode: str = 'fast'):
+        """ Generate document analytics with AI API """
+
         print(f" > [AI] Generating analysis in mode: {mode}.")
 
         try:
@@ -552,7 +587,7 @@ class DocumentProcessor:
         print("-------------------------------------------------------------------")
         print(" > Analyze started.")
 
-    def _preprocess_file(self, file_text) -> dict:
+    def _preprocess_file(self, file_text: str) -> dict:
         print(" > [DocProcessor] Preprocessing file.")
         try:
             preprocessed = self.ai_service.censor(file_text)
@@ -562,7 +597,7 @@ class DocumentProcessor:
             print(f" > Preprocessing error: {e}")
             return {"content": {}}
 
-    def _main_process(self, user, file_dict) -> dict:
+    def _main_process(self, user: dict, file_dict: dict) -> dict:
         print(" > [DocProcessor] Main process started.")
         try:
             used_model = "smart" if user["tier"] == "premium" else "fast"
@@ -576,14 +611,17 @@ class DocumentProcessor:
             print(f" > [DocProcessor] Analysis crashed: {e}")
             return None
 
-    def analyze(self, text, user) -> str:
+    def analyze(self, text: str, user: dict) -> str:
         print(" > [DocProcessor] Analyze called.")
+
+        # Preprocess file
         try:
             raw_dict = self._preprocess_file(text)
         except Exception as e:
             print(f" > [DocProcessor] Preprocess crashed hard: {e}")
             raw_dict = {"content": {}}
 
+        # Analyze file
         try:
             result = self._main_process(user, raw_dict)
         except Exception as e:
@@ -591,5 +629,5 @@ class DocumentProcessor:
             result = None
 
         print(" > [DocProcessor] Analyze finished.")
-        print(f" > Final: {result}")
+        #print(f" > Final: {result}")
         return result

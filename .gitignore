@@ -7,4 +7,7 @@
 _trash/
 
 **/__pycache__/
+
 **/law_db/
+*.sqlite3
+*.db
