@@ -7,43 +7,23 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 ROOT_DIR = BASE_DIR.parent
 
-# Load .env file
-
+# = Load .env file = #
 env = environ.Env()
 environ.Env.read_env(os.path.join(ROOT_DIR, '.env'))
 
-# Private definition
-
+# = Private definition = #
 SECRET_KEY = env('SECRET_KEY')
-
 DEBUG = env.get_value('DEBUG', cast=bool, default=False)
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
-
-# Application definition
-
+# = Application definition = #
 INSTALLED_APPS = [
-    # System
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    # REST API
-    'rest_framework',
-    'rest_framework.authtoken',
-    'dj_rest_auth',
-    
-    # Allauth
-    'django.contrib.sites',
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
-    
-    # Google provider
-    'allauth.socialaccount.providers.google', 
 ]
 
 MIDDLEWARE = [
@@ -54,8 +34,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
-    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -77,55 +55,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
+# = Defaunt DATABASES setting = #
 DATABASES = {
-    'default': env.db_url('DATABASE_URL',
-                          default=f"postgres://{env('DB_USER')}:{env('DB_PASS')}@{env('DB_HOST')}:{env('DB_PORT')}/{env('DB_NAME')}")
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
 
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
-]
+AUTH_PASSWORD_VALIDATORS = []
 
-# REST API
-
-SITE_ID = 1
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
-    ),
-}
-REST_USE_JWT = True
-JWT_AUTH_COOKIE = 'website-auth'
-
-# Internationalization
-
+# = Internationalization = #
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-
 STATIC_URL = 'static/'
 
-# Custom definitions
-
+# = Custom definitions = #
 LOGIC_CONF_DIR = BASE_DIR / 'config'
 
 LAW_DB_PATH = "..\\backend\\law_db\\"

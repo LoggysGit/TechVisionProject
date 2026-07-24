@@ -7,12 +7,16 @@ import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 import Header from '@/components/Header.vue'
 import Footer from '../components/Footer.vue'
 import Background from '@/components/Background.vue'
+
 import ReportModal from '@/components/ReportModal.vue'
+import Notification from '@/components/Notification.vue'
 
 import BGImage from '../assets/images/bg_workspace.jpeg'
 
 // === Global section === //
 const backendAPI = 'http://127.0.0.1:8000/'
+
+const notifyRef = ref(null)
 
 const pastAnalyses = ref([])
 
@@ -187,7 +191,9 @@ async function submitAnalysis() {
     const preprocessedText = `Человек, от лица которого необходимо рассматривать документ: ${name}.\nДОКУМЕНТ:\n${secureText}`
 
     // 2. Send
-    const response = await fetch(`${backendAPI}/api/analyze/`, {
+    const response = null
+    try {
+      response = await fetch(`${backendAPI}/api/analyze/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -197,6 +203,10 @@ async function submitAnalysis() {
         content: preprocessedText
       })
     })
+    }
+    catch{
+      throw new Error('Server does not responding.')
+    }
 
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`)
@@ -212,9 +222,12 @@ async function submitAnalysis() {
 
     saveAnalysis(fileLabel, backendData)
 
-  } catch (error) {
+  }
+  catch (error) {
     console.error('File error:', error)
-  } finally {
+    notifyRef.value?.show(`${error}`, 'error')
+  }
+  finally {
     isLoading.value = false
   }
 }
@@ -362,6 +375,9 @@ document.addEventListener("DOMContentLoaded", () => {
         </aside>
       </section>
     </main>
+
+    <!-- Notification toast -->
+    <Notification ref="notifyRef" />
 
     <!-- Modal Window for Results -->
     <ReportModal 

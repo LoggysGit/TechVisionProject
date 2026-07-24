@@ -9,7 +9,6 @@ from django.urls import path, include
 #from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 
 from django.http import JsonResponse
-from users import views as users_views
 from logic import views as logic_views
 
 urlpatterns = [

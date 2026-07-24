@@ -8,13 +8,13 @@ environ
 cryptography
 
 # OAuth
-django-allauth
-dj-rest-auth
-djangorestframework-simplejwt
+#django-allauth
+#dj-rest-auth
+#djangorestframework-simplejwt
 
 # PostgreSQL
-psycopg2-binary
-django-environ
+#psycopg2-binary
+#django-environ
 
 # Logic tools
 packaging
