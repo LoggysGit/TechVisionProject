@@ -52,8 +52,62 @@ class LawRetriever:
                 f"Run LawRetriever.build_law_index() before use."
             ) from e
 
+    def _compress_document(self, doc_text: str, query_embedding: list, max_chars: int = 800) -> str:
+        # Split document on part
+        try:
+            header, sep, body = doc_text.partition("\n")
+            if not sep:
+                header, body = "", doc_text
+
+        except Exception as e:
+            print(f" > [LawRetriever] Partition failed: {e}")
+            return doc_text
+
+        # Split parts on sentences
+        try:
+            sentences = [s for s in re.split(r'(?<=[.!?])\s+', body.strip()) if s]
+
+        except Exception as e:
+            print(f" > [LawRetriever] Sentence split failed: {e}")
+            return doc_text
+
+        if not sentences or len(doc_text) <= max_chars:
+            return doc_text
+
+        # Emded & score
+        try:
+            sent_embeddings = self.embedder.encode(sentences, normalize_embeddings=True)
+            query_vec = np.array(query_embedding)
+            scores = sent_embeddings @ query_vec
+
+        except Exception as e:
+            print(f" > [LawRetriever] Scoring failed, returning raw doc: {e}")
+            return doc_text
+
+        # Rank articles
+        try:
+            ranked_idx = sorted(range(len(sentences)), key=lambda i: scores[i], reverse=True)
+
+            selected = set()
+            total_len = len(header)
+            for i in ranked_idx:
+                if total_len + len(sentences[i]) > max_chars and selected:
+                    break
+
+                selected.add(i)
+                total_len += len(sentences[i]) + 1
+
+            kept = [sentences[i] for i in sorted(selected)]
+            return (header + "\n" if header else "") + " ".join(kept)
+
+        except Exception as e:
+            print(f" > [LawRetriever] Ranking failed, returning raw doc: {e}")
+            return doc_text
+
     def find_relevant_articles(self, document_text: str, top_k: int = 5, max_chars_per_article: int = 800) -> str:
         print(f" > [LawRetriever] Searching top_k={top_k} articles.")
+
+        # Encode query
         try:
             query_embedding = self.embedder.encode(
                 [document_text[:2000]], normalize_embeddings=True
@@ -62,6 +116,7 @@ class LawRetriever:
             print(f" > [LawRetriever] Failed to encode query: {e}")
             return "No relevant articles found."
 
+        # Get nearest records
         try:
             results = self.collection.query(
                 query_embeddings=query_embedding,
@@ -87,49 +142,7 @@ class LawRetriever:
 
         return "\n\n---\n\n".join(compressed)
 
-    def _compress_document(self, doc_text: str, query_embedding: list, max_chars: int = 800) -> str:
-        try:
-            header, sep, body = doc_text.partition("\n")
-            if not sep:
-                header, body = "", doc_text
-        except Exception as e:
-            print(f" > [LawRetriever] Partition failed: {e}")
-            return doc_text
-
-        try:
-            sentences = [s for s in re.split(r'(?<=[.!?])\s+', body.strip()) if s]
-        except Exception as e:
-            print(f" > [LawRetriever] Sentence split failed: {e}")
-            return doc_text
-
-        if not sentences or len(doc_text) <= max_chars:
-            return doc_text
-
-        try:
-            sent_embeddings = self.embedder.encode(sentences, normalize_embeddings=True)
-            query_vec = np.array(query_embedding)
-            scores = sent_embeddings @ query_vec
-        except Exception as e:
-            print(f" > [LawRetriever] Scoring failed, returning raw doc: {e}")
-            return doc_text
-
-        try:
-            ranked_idx = sorted(range(len(sentences)), key=lambda i: scores[i], reverse=True)
-
-            selected = set()
-            total_len = len(header)
-            for i in ranked_idx:
-                if total_len + len(sentences[i]) > max_chars and selected:
-                    break
-                selected.add(i)
-                total_len += len(sentences[i]) + 1
-
-            kept = [sentences[i] for i in sorted(selected)]
-            return (header + "\n" if header else "") + " ".join(kept)
-        except Exception as e:
-            print(f" > [LawRetriever] Ranking failed, returning raw doc: {e}")
-            return doc_text
-
+    # - Build law index function - #
     @staticmethod
     def extract_law_text(pdf_path: str) -> str:
         print(f" > [LawRetriever] Extracting text from {pdf_path}.")
@@ -575,17 +588,15 @@ class AIService:
 class DocumentProcessor:
     def __init__(self):
         print(" > [DocProcessor] Init started.")
+
         try:
             self.ai_service = AIService()
+
         except Exception as e:
             print(f" > [DocProcessor] Failed to init AIService: {e}")
             raise
 
-        #print(" > Building law index...")
-        #LawRetriever.build_law_index()
-
-        print("-------------------------------------------------------------------")
-        print(" > Analyze started.")
+        print(" > [DocProcessor] Processor started.")
 
     def _preprocess_file(self, file_text: str) -> dict:
         print(" > [DocProcessor] Preprocessing file.")
