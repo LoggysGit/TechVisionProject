@@ -23,71 +23,30 @@ class LawRetriever:
     """ Law index builder """
 
     def __init__(self):
-        print(" > [LawRetriever] Init started.")
-
-        # Init embedder
-        try:
-            self.embedder = SentenceTransformer(settings.SEN_TRANSFORMER_MODEL, device='cpu')
-            print(" > [LawRetriever] Embedder loaded.")
-        except Exception as e:
-            print(f" > [LawRetriever] Failed to load embedder: {e}")
-            raise
-
-        # Init DB client
-        try:
-            self.db_client = chromadb.PersistentClient(path=settings.LAW_DB_PATH)
-            print(" > [LawRetriever] DB client connected.")
-        except Exception as e:
-            print(f" > [LawRetriever] Failed to connect DB: {e}")
-            raise
-
-        # Load DB data
-        try:
-            self.collection = self.db_client.get_collection("housing_law")
-            print(" > [LawRetriever] Collection loaded.")
-        except Exception as e:
-            print(f" > [LawRetriever] Collection not found: {e}")
-            raise RuntimeError(
-                f"Law database not found at {settings.LAW_DB_PATH}. "
-                f"Run LawRetriever.build_law_index() before use."
-            ) from e
+        print(" > [LawRetriever] Initted successgully.")
 
     def _compress_document(self, doc_text: str, query_embedding: list, max_chars: int = 800) -> str:
         """ Compresses document into vectors """
 
-        # Split document on part
         try:
+            # Split document on part
             header, sep, body = doc_text.partition("\n")
             if not sep:
                 header, body = "", doc_text
 
-        except Exception as e:
-            print(f" > [LawRetriever] Partition failed: {e}")
-            return doc_text
-
-        # Split parts on sentences
-        try:
+            # Split parts on sentences
             sentences = [s for s in re.split(r'(?<=[.!?])\s+', body.strip()) if s]
 
-        except Exception as e:
-            print(f" > [LawRetriever] Sentence split failed: {e}")
-            return doc_text
+            # Validate
+            if not sentences or len(doc_text) <= max_chars:
+                return doc_text
 
-        if not sentences or len(doc_text) <= max_chars:
-            return doc_text
-
-        # Emded & score
-        try:
+            # Emded & score
             sent_embeddings = self.embedder.encode(sentences, normalize_embeddings=True)
             query_vec = np.array(query_embedding)
             scores = sent_embeddings @ query_vec
 
-        except Exception as e:
-            print(f" > [LawRetriever] Scoring failed, returning raw doc: {e}")
-            return doc_text
-
-        # Rank articles
-        try:
+            # Rank articles
             ranked_idx = sorted(range(len(sentences)), key=lambda i: scores[i], reverse=True)
 
             selected = set()
@@ -100,10 +59,11 @@ class LawRetriever:
                 total_len += len(sentences[i]) + 1
 
             kept = [sentences[i] for i in sorted(selected)]
+
             return (header + "\n" if header else "") + " ".join(kept)
 
         except Exception as e:
-            print(f" > [LawRetriever] Ranking failed, returning raw doc: {e}")
+            print(f" > [LawRetriever] Compressing failed: {e}")
             return doc_text
 
     def find_relevant_articles(self, document_text: str, top_k: int = 5, max_chars_per_article: int = 800) -> str:
@@ -111,40 +71,35 @@ class LawRetriever:
 
         print(f" > [LawRetriever] Searching top_k={top_k} articles.")
 
-        # Encode query
         try:
+            # Encode query
             query_embedding = self.embedder.encode(
                 [document_text[:2000]], normalize_embeddings=True
             ).tolist()
-        except Exception as e:
-            print(f" > [LawRetriever] Failed to encode query: {e}")
-            return "No relevant articles found."
 
-        # Get nearest records
-        try:
+            # Get nearest records
             results = self.collection.query(
                 query_embeddings=query_embedding,
                 n_results=top_k
             )
+
+            # Validate
+            if not results['documents'] or not results['documents'][0]:
+                print(" > [LawRetriever] No documents found.")
+                return "No relevant articles found."
+            print(f" > [LawRetriever] Found {len(results['documents'][0])} articles. Compressing...")
+
+            # Collect all
+            compressed = []
+            for doc in results['documents'][0]:
+                comp_doc = self._compress_document(doc, query_embedding[0], max_chars_per_article)
+                compressed.append(comp_doc)
+
         except Exception as e:
-            print(f" > [LawRetriever] DB query failed: {e}")
+            print(f" > [LawRetriever] Failed to encode query: {e}")
             return "No relevant articles found."
 
-        if not results['documents'] or not results['documents'][0]:
-            print(" > [LawRetriever] No documents found.")
-            return "No relevant articles found."
-
-        print(f" > [LawRetriever] Found {len(results['documents'][0])} articles. Compressing...")
-
-        compressed = []
-        for doc in results['documents'][0]:
-            try:
-                compressed.append(self._compress_document(doc, query_embedding[0], max_chars_per_article))
-            except Exception as e:
-                print(f" > [LawRetriever] Compression failed for one doc, using raw: {e}")
-                compressed.append(doc)
-
-        return "\n\n---\n\n".join(compressed)
+        return"\n\n---\n\n".join(compressed)
 
     # - Build law index function - #
     @staticmethod
@@ -152,28 +107,18 @@ class LawRetriever:
         """ Extracts law text from law PDF """
 
         print(f" > [LawRetriever] Extracting text from {pdf_path}.")
+
         try:
-            doc = fitz.open(pdf_path)
+            with fitz.open(pdf_path) as doc:
+                pages_text = [page.get_text() for page in doc]
+                text = "\n".join(pages_text)
+    
+                print(f" > [LawRetriever] Extracted {len(text)} chars.")
+                return text
+            
         except Exception as e:
-            print(f" > [LawRetriever] Failed to open PDF: {e}")
+            print(f" > [LawRetriever] Failed to extract text from PDF: {e}")
             return ""
-
-        text = ""
-        try:
-            for page in doc:
-                try:
-                    text += page.get_text()
-                except Exception as e:
-                    print(f" > [LawRetriever] Failed to read one page: {e}")
-                    continue
-        finally:
-            try:
-                doc.close()
-            except Exception as e:
-                print(f" > [LawRetriever] Failed to close PDF: {e}")
-
-        print(f" > [LawRetriever] Extracted {len(text)} chars.")
-        return text
 
     @staticmethod
     def split_into_articles(text: str) -> dict:
@@ -181,39 +126,32 @@ class LawRetriever:
 
         print(" > [LawRetriever] Splitting text into articles.")
 
-        # Cleanup
         try:
+            # Cleanup
             text = re.sub(r'[ \t]+', ' ', text)
             text = re.sub(r'\n{2,}', '\n', text)
-        except Exception as e:
-            print(f" > [LawRetriever] Text cleanup failed: {e}")
-            return {}
 
-        # RegEx match
-        try:
+            # RegEx match
             pattern = r'Article\s*(\d+(?:-\d+)?)\.\s*([^\n]*)\n(.*?)(?=Article\s*\d+(?:-\d+)?\.|\Z)'
             matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
-        except Exception as e:
-            print(f" > [LawRetriever] Regex match failed: {e}")
-            return {}
 
-        # Extract articles
-        articles = {}
-        for num, title, content in matches:
-            try:
+            # Extract articles
+            articles = {}
+            for num, title, content in matches:
                 clean_content = re.sub(r'\s+', ' ', content.strip())
-                if len(clean_content) < 10:
+                if len(clean_content) < 10: # Treshold for non-informative lines
                     continue
                 articles[num] = {
                     "title": title.strip(),
                     "content": clean_content
                 }
-            except Exception as e:
-                print(f" > [LawRetriever] Skipped one article ({num}): {e}")
-                continue
 
-        print(f" > [LawRetriever] Parsed {len(articles)} articles.")
-        return articles
+            print(f" > [LawRetriever] Parsed {len(articles)} articles.")
+            return articles
+
+        except Exception as e:
+            print(f" > [LawRetriever] Failed to split document: {e}")
+            return {}
 
     @staticmethod
     def build_law_index():
@@ -221,51 +159,35 @@ class LawRetriever:
 
         print(" > [Law index] Build started.")
 
+        # Extract & validate text
         raw_text = LawRetriever.extract_law_text(settings.LAW_PDF_PATH)
         if not raw_text:
             print(" > [Law index] No text extracted, aborting.")
             return
 
         articles = LawRetriever.split_into_articles(raw_text)
-
         if not articles:
             print(" > [Law index] Parser didn't find any articles.")
             return
 
         print(f" > [Law index] Found {len(articles)} articles: {list(articles.keys())}")
 
-        try:
-            embedder = SentenceTransformer(settings.SEN_TRANSFORMER_MODEL, device='cpu')
-        except Exception as e:
-            print(f" > [Law index] Failed to load embedder: {e}")
-            return
+        # Init objects
+        embedder = SentenceTransformer(settings.SEN_TRANSFORMER_MODEL, device='cpu')
+        client = chromadb.PersistentClient(path=settings.LAW_DB_PATH)
 
-        try:
-            client = chromadb.PersistentClient(path=settings.LAW_DB_PATH)
-        except Exception as e:
-            print(f" > [Law index] Failed to connect DB client: {e}")
-            return
-
+        # Reload collection
         try:
             client.delete_collection("housing_law")
-            print(" > [Law index] Old collection deleted.")
-        except Exception as e:
-            print(f" > [Law index] No old collection to delete (fine): {e}")
+        except Exception:
+            pass
+        collection = client.create_collection("housing_law")
 
-        try:
-            collection = client.create_collection("housing_law")
-        except Exception as e:
-            print(f" > [Law index] Failed to create collection: {e}")
-            return
-
+        # Build & Save
         try:
             docs = [f"Article {num}: {v['title']}\n{v['content']}" for num, v in articles.items()]
             embeddings = embedder.encode(docs, normalize_embeddings=True).tolist()
-        except Exception as e:
-            print(f" > [Law index] Failed to build embeddings: {e}")
-            return
 
-        try:
             collection.add(
                 documents=docs,
                 embeddings=embeddings,
@@ -273,38 +195,31 @@ class LawRetriever:
                 metadatas=[{"article_num": num, "title": v['title']} for num, v in articles.items()]
             )
             print(f" > [Law index] Done. Saved in {settings.LAW_DB_PATH}.")
-        except Exception as e:
-            print(f" > [Law index] Failed to write to DB: {e}")
 
-class CensorshipError(Exception):
-    """ Error catcher """
+        except Exception as e:
+            print(f" > [Law index] Failed to build embeddings: {e}")
+            return
 
 class AIService:
     """ AI tools & services class """
 
-    def __init__(self):
+    def __init__(self, law_retriever: LawRetriever):
         print(" > [AIService] Init started.")
 
-        try:
-            api_key = settings.GROQ_KEY
-            self.client = Groq(api_key=api_key)
-            print(" > [AIService] Groq client ready.")
-        except Exception as e:
-            print(f" > [AIService] Failed to init Groq client: {e}")
-            raise
+        # Groq client
+        api_key = settings.GROQ_KEY
+        self.client = Groq(api_key=api_key)
 
+        # Law retriever
+        self.retriever = law_retriever
+
+        # Local variables
         self.config_dir = settings.LOGIC_CONF_DIR
         self.active_mode = None
 
-        try:
-            self.retriever = LawRetriever()
-        except Exception as e:
-            print(f" > [AIService] Failed to init LawRetriever: {e}")
-            raise
-
         self._local_llm = None
 
-        # Schema with explanations IN RUSSIAN (For LLM)
+        # Schema with explanations for LLM IN RUSSIAN (And convertion into string)
         self.finding_schema = {
             "clause_ref": "номер пункта договора, например '3.5' или '5.2'",
             "excerpt": "точная цитата из договора",
@@ -313,6 +228,8 @@ class AIService:
             "explanation": "что это значит для нанимателя простыми словами",
             "mitigation": "как переформулировать пункт по закону, или пустая строка если риска нет"
         }
+        self.schema_str = json.dumps(self.finding_schema, ensure_ascii=False)
+
         print(" > [AIService] Init done.")
 
     @staticmethod
@@ -341,43 +258,25 @@ class AIService:
             raise e
 
     # - Setters - #
-    def _set_mode(self, mode: str):
+    def _set_mode(self, mode: str = 'fast'):
         print(f" > [AIService] Setting mode: {mode}.")
+
         if mode not in settings.GROQ_MODELS:
-            print(f" > [AIService] Unknown mode: {mode}.")
-            raise ValueError(f"Unknown mode: {mode}.")
+            print(f" > [AIService] Unknown mode: {mode}. Set to default.")
+
         self.active_mode = mode
 
     # - Getters - #
-    def _get_analyzer_system_prompt(self) -> str:
-        sys_prompt_path = os.path.join(self.config_dir, f"sys_prompt_{self.active_mode}.txt")
-        print(f" > [AIService] Reading analyzer prompt: {sys_prompt_path}.")
+    def _get_system_prompt(self, prompt_path: str) -> str:
+        sys_prompt_path = os.path.join(self.config_dir, prompt_path)
+        print(f" > [AIService] Reading prompt: {sys_prompt_path}.")
 
         if not os.path.exists(sys_prompt_path):
             print(f" > [AIService] Prompt file missing: {sys_prompt_path}.")
             raise FileNotFoundError(f"{sys_prompt_path} not found.")
 
-        try:
-            with open(sys_prompt_path, 'r', encoding='utf-8') as f:
-                return f.read().strip()
-        except Exception as e:
-            print(f" > [AIService] Failed to read prompt file: {e}")
-            raise
-
-    def _get_censor_system_prompt(self) -> str:
-        sys_prompt_path = os.path.join(self.config_dir, "sys_prompt_censor.txt")
-        print(f" > [AIService] Reading censor prompt: {sys_prompt_path}.")
-
-        if not os.path.exists(sys_prompt_path):
-            print(f" > [AIService] Prompt file missing: {sys_prompt_path}.")
-            raise FileNotFoundError(f"{sys_prompt_path} not found.")
-
-        try:
-            with open(sys_prompt_path, 'r', encoding='utf-8') as f:
-                return f.read().strip()
-        except Exception as e:
-            print(f" > [AIService] Failed to read censor prompt: {e}")
-            raise
+        with open(sys_prompt_path, 'r', encoding='utf-8') as f:
+            return f.read().strip()
 
     def _get_local_llm(self) -> Llama:
         if self._local_llm is None:
@@ -391,7 +290,8 @@ class AIService:
                 print(" > [Censor] Local LLM loaded.")
             except Exception as e:
                 print(f" > [Censor] Failed to load local LLM: {e}")
-                raise
+                return None
+
         return self._local_llm
 
     # - Internal functions - #
@@ -404,6 +304,7 @@ class AIService:
 
             valid_types = ("ФИО", "АДРЕС", "КОМПАНИЯ")
 
+            # Extract & Validate entities
             for entity in entities:
                 try:
                     mask = entity.get("mask")
@@ -425,57 +326,52 @@ class AIService:
 
             print(f" > [Censor] {len(flat_occurrences)} occurrences to replace.")
 
-            # Long phrases first
+            # Apply RegEx (Long phrases first)
             flat_occurrences.sort(key=lambda pair: len(pair[0]), reverse=True)
-
             for occurrence, mask in flat_occurrences:
-                try:
-                    if occurrence not in text:
-                        print(f" > [Censor] Not found: {occurrence!r}")
-                        continue
-                    text = text.replace(occurrence, mask)
-                    print(f" > [Censor] Replaced {occurrence!r} with {mask!r}.")
-
-                except Exception as e:
-                    print(f" > [Censor] Failed to replace {occurrence!r}: {e}")
+                if occurrence not in text:
+                    print(f" > [Censor] Not found: {occurrence!r}")
                     continue
+
+                text = text.replace(occurrence, mask)
+                print(f" > [Censor] Replaced {occurrence!r} with {mask!r}.")
 
             print(f" > [Censor] Censored version: {text}")
             return text
 
         except Exception as e:
-            print(f" > [Censor] Fatal error during censoring, returning original text: {e}")
-            return text
+            print(f" > [Censor] Fatal error during censoring: {e}")
+            return ""
 
     # - Public functions - #
     def censor(self, raw: str) -> str:
-        """ Full censor function. Censors special elements: name, adress, company, subscription """
+        """ Full censor function. Censors special elements: name, adress, company """
 
         print(" > [Censor] Censoring started.")
-
+        
+        # Prepare AI
         try:
-            system_prompt = self._get_censor_system_prompt()
-        except Exception as e:
-            print(f" > [Censor] Failed to get system prompt: {e}")
-            raise CensorshipError(f"Censor prompt error: {e}") from e
+            system_prompt = self._get_system_prompt("sys_censor_prompt.txt")
 
-        try:
             llm = self._get_local_llm()
+            if llm is None:
+                return ""
         except Exception as e:
-            print(f" > [Censor] Failed to get local LLM: {e}")
-            raise CensorshipError(f"Local LLM error: {e}") from e
+            print(f" > [Censor] Censor setup error: {e}. Returning empty string.")
+            return ""
 
+        # Censor
         user_message = (
             f"Текст документа:\n---\n{raw}\n---\n\n"
             f"Верни СТРОГО валидный JSON без пояснений.\n"
             f"От твоей работы зависит БЕЗОПАСНОСТЬ всех людей в тексте. Они РЕАЛЬНЫ."
         )
-
         max_retries = 3
-        raw_output = None
+        raw_output = "{}"
 
         for attempt in range(max_retries):
             print(f" > [Censor] Attempt {attempt}.")
+
             try:
                 completion = llm.create_chat_completion(
                     messages=[
@@ -496,59 +392,43 @@ class AIService:
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                raise CensorshipError(f" > [Censor] Local LLM unavailable: {e}") from e
 
-        try:
+        # Parse result
+        try: 
             parsed = json.loads(raw_output)
             entities = parsed.get("entities", [])
             print(f" > [Censor] Parsed {len(entities)} entities.")
 
-        except (json.JSONDecodeError, AttributeError) as e:
-            print(f" > [Censor] JSON parse failed: {e}")
-            raise CensorshipError(f" > [Censor] Invalid JSON: {raw_output!r}") from e
-
-        try:
             return self._apply_censor_replacements(raw, entities)
-        except Exception as e:
-            print(f" > [Censor] Replacement step crashed, returning original text: {e}")
-            return raw
 
-    def generate_analysis(self, report, mode: str = 'fast'):
+        except Exception as e:
+            print(f" Incorrect JSON output: {raw_output}. Error: {e}")
+            return ""
+
+    def generate_analysis(self, report, mode: str):
         """ Generates document analytics with AI API """
 
         print(f" > [AI] Generating analysis in mode: {mode}.")
 
-        try:
-            self._set_mode(mode)
-        except Exception as e:
-            print(f" > [AI] Failed to set mode: {e}")
-            return None
+        # Get LLM mode
+        self._set_mode(mode)
+        model_name = settings.GROQ_MODELS[mode]
 
-        try:
-            model_name = settings.GROQ_MODELS[mode]
-        except Exception as e:
-            print(f" > [AI] Model lookup failed: {e}")
-            return None
-
+        # Validate report
         document_text = report.get("content", "") if isinstance(report, dict) else report
         if not document_text:
             print(" > [AI] Empty document text, aborting.")
             return None
 
-        top_k = 4 if mode == 'fast' else 8
-
+        # Get law articles
+        top_k = settings.LAW_ARTICLES[mode]
         try:
             law_context = self.retriever.find_relevant_articles(document_text, top_k=top_k)
         except Exception as e:
             print(f" > [AI] Failed to fetch law context: {e}")
             law_context = "No relevant articles found."
 
-        try:
-            schema_str = json.dumps(self.finding_schema, ensure_ascii=False)
-        except Exception as e:
-            print(f" > [AI] Failed to dump schema: {e}")
-            return None
-
+        # Prepare prompts
         user_message = (
             f"ЗАКОН (выдержка из статей):\n{law_context}\n\n"
             f"ДОГОВОР:\n{document_text}\n\n---\n"
@@ -559,23 +439,24 @@ class AIService:
             f"3. Указывай номер статьи ТОЛЬКО из предоставленного текста ЗАКОНА (например, 'Статья 544' или 'Статья 24').\n"
             f"4. СТРОГО ЗАПРЕЩЕНО придумывать номера статей, которых НЕТ в блоке ЗАКОН.\n"
             f"5. Пиши 'не найдено в предоставленном законе' ТОЛЬКО в самом крайнем случае, если в блоке ЗАКОН вообще нет ни одного упоминания этой темы.\n\n"
-            
+
             f"ПРАВИЛА ДЛЯ 'mitigation':\n"
             f"- Для категории 'risk' или для очевидно неадекватных условий/сумм — ОБЯЗАТЕЛЬНО предложи конкретную юридически корректную формулировку для исправления.\n"
             f"- Для остальных категорий — предложи улучшение текста договора.\n\n"
-            
+
             f"ОГРАНИЧЕНИЕ ОБЛАСТИ:\n"
             f"Если документ вообще не является договором аренды/жилищным правом — верни {{\"findings\": []}}.\n\n"
-            f"Формат ответа:\n{schema_str}\n\n"
+            f"Формат ответа:\n{self.schema_str}\n\n"
             f"Отвечай СТРОГО в формате JSON: {{\"findings\": [ ... ]}}"
         )
 
         try:
-            system_prompt = self._get_analyzer_system_prompt()
+            system_prompt = self._get_system_prompt(f"sys_prompt_{self.active_mode}.txt")
         except Exception as e:
             print(f" > [AI] Failed to load system prompt: {e}")
             return None
 
+        # Try to get an analysis from API
         max_retries = 3
         for attempt in range(max_retries):
             print(f" > [AI] Attempt {attempt}.")
@@ -612,62 +493,47 @@ class AIService:
 
 class DocumentProcessor:
     def __init__(self):
-        print(" > [DocProcessor] Init started.")
+        print(" > [DocProcessor] Initted.")
 
-        try:
-            self.ai_service = AIService()
-
-        except Exception as e:
-            print(f" > [DocProcessor] Failed to init AIService: {e}")
-            raise
-
-        print(" > [DocProcessor] Processor started.")
-
-    def _preprocess_file(self, file_text: str) -> dict:
+    def _preprocess_file(self, ai_service: AIService, file_text: str) -> dict:
         print(" > [DocProcessor] Preprocessing file.")
 
-        try:
-            preprocessed = self.ai_service.censor(file_text)
-            print(" > [DocProcessor] Censoring done.")
-            return {"content": preprocessed}
-        except Exception as e:
-            print(f" > Preprocessing error: {e}")
-            return {"content": {}}
+        preprocessed = ai_service.censor(file_text)
 
-    def _main_process(self, user: dict, file_dict: dict) -> dict:
+        print(" > [DocProcessor] Censoring done.")
+        return {"content": preprocessed}
+
+    def _main_process(self, ai_service: AIService, user: dict, file_dict: dict) -> dict:
         print(" > [DocProcessor] Main process started.")
 
-        try:
-            used_model = "smart" if user["tier"] == "premium" else "fast"
-        except Exception as e:
-            print(f" > [DocProcessor] Failed to read user tier, using fast: {e}")
-            used_model = "fast"
+        used_model = "smart" if user["tier"] == "premium" else "fast"
 
-        try:
-            return self.ai_service.generate_analysis(file_dict, used_model)
-        except Exception as e:
-            print(f" > [DocProcessor] Analysis crashed: {e}")
-            return None
+        return ai_service.generate_analysis(file_dict, used_model)
 
     def analyze(self, text: str, user: dict) -> str:
         """ Main document analyze cycle """
 
         print(" > [DocProcessor] Analyze called.")
 
-        # Preprocess file
+        # Check all
+        if not settings.GROQ_KEY:
+            return ""
+        
         try:
-            raw_dict = self._preprocess_file(text)
-        except Exception as e:
-            print(f" > [DocProcessor] Preprocess crashed hard: {e}")
-            raw_dict = {"content": {}}
+            # Init
+            retriever = LawRetriever()
+            ai_service = AIService(retriever)
 
-        # Analyze file
-        try:
-            result = self._main_process(user, raw_dict)
-        except Exception as e:
-            print(f" > [DocProcessor] Main process crashed hard: {e}")
-            result = None
+            # Preprocess file
+            raw_dict = self._preprocess_file(ai_service, text)
 
-        print(" > [DocProcessor] Analyze finished.")
-        #print(f" > Final: {result}")
-        return result
+            # Analyze file
+            result = self._main_process(ai_service, user, raw_dict)
+
+            print(" > [DocProcessor] Analyze finished.")
+            #print(f" > Final: {result}")
+            return result
+
+        except Exception as e:
+            print(f"Analyze error. Maybe, something is not set. Error: {e}")
+            return ""

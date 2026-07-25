@@ -94,3 +94,7 @@ GROQ_MODELS = {
     'fast': 'llama-3.3-70b-versatile',
     'smart': 'llama-3.3-70b-versatile'
 }
+LAW_ARTICLES = {
+    'fast': 3,
+    'smart': 6
+}
