@@ -117,7 +117,7 @@ const parsedData = computed(() => {
   if (!props.reportData) return {}
 
   let data = props.reportData.report
-  if (typeof data.result === 'string') {
+  if (data.result && typeof data.result === 'string') {
     try {
       data = JSON.parse(data.result)
     } catch (e) {

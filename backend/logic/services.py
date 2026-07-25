@@ -27,12 +27,8 @@ class LawRetriever:
         self.embedder = SentenceTransformer(settings.SEN_TRANSFORMER_MODEL, device='cpu')
         self.db_client = chromadb.PersistentClient(path=settings.LAW_DB_PATH)
 
-        # Reload collection
-        try:
-            self.db_client.delete_collection("housing_law")
-        except Exception:
-            pass
-        self.collection = self.db_client.create_collection("housing_law")
+        # Load collection
+        self.collection = self.db_client.get_or_create_collection("housing_law")
 
         print(" > [LawRetriever] Initted successfully.")
 
@@ -78,14 +74,20 @@ class LawRetriever:
             return doc_text
 
     def find_relevant_articles(self, document_text: str, top_k: int = 5, max_chars_per_article: int = 800) -> str:
-        """ Finds relevan articles by meaning """
+        """ Finds relevant articles by meaning """
 
         print(f" > [LawRetriever] Searching top_k={top_k} articles.")
 
         try:
+            if self.collection.count() == 0:
+                print(" > [LawRetriever] CRITICAL: ChromaDB collection is empty!")
+
+            search_query = (f"Договор аренды жилья, плата за проживание, залог, выселение, обязанности арендатора и арендодателя. "
+                            f"{document_text[:800]}")
+
             # Encode query
             query_embedding = self.embedder.encode(
-                [document_text[:2000]], normalize_embeddings=True
+                [search_query], normalize_embeddings=True
             ).tolist()
 
             # Get nearest records
@@ -95,22 +97,30 @@ class LawRetriever:
             )
 
             # Validate
-            if not results['documents'] or not results['documents'][0]:
+            docs = results.get('documents', [[]])
+            if not docs or not docs[0]:
+                print(" > [LawRetriever] Warning: Vector search returned empty list. Returning default top articles...")
+
+                all_docs = self.collection.get(limit=top_k)
+                docs = [all_docs.get('documents', [])]
+
+            if not docs or not docs[0]:
                 print(" > [LawRetriever] No documents found.")
                 return "No relevant articles found."
-            print(f" > [LawRetriever] Found {len(results['documents'][0])} articles. Compressing...")
+
+            print(f" > [LawRetriever] Found {len(docs[0])} articles. Compressing...")
 
             # Collect all
             compressed = []
-            for doc in results['documents'][0]:
+            for doc in docs[0]:
                 comp_doc = self._compress_document(doc, query_embedding[0], max_chars_per_article)
                 compressed.append(comp_doc)
 
         except Exception as e:
-            print(f" > [LawRetriever] Failed to encode query: {e}")
+            print(f" > [LawRetriever] Failed to encode query or query ChromaDB: {e}")
             return "No relevant articles found."
 
-        return"\n\n---\n\n".join(compressed)
+        return "\n\n---\n\n".join(compressed)
 
     # - Build law index function (static) - #
     @staticmethod
