@@ -443,16 +443,17 @@ class AIService:
         user_message = (
             f"ЗАКОН:\n{law_context}\n\n"
             f"ДОГОВОР:\n{document_text}\n\n---\n"
-            f"Пройди договор пункт за пунктом. Для каждой выявленной проблемы/риска создай отдельный объект в 'findings'.\n\n"
+            f"Прайди договор пункт за пунктом. Для каждой выявленной сущности создай отдельный объект в 'findings'.\n\n"
+            f"Номер пункта договора (article) и точная цитата (excerpt) должны быть ВСЕГДА. Цитата должна совпадать с текстом договора дословно (символ в символ).\n\n"
             f"ПРАВИЛА ДЛЯ 'source' (КРИТИЧЕСКИ ВАЖНО):\n"
             f"1. Твоя главная задача — найти статью из раздела ЗАКОН, которая хотя бы КОСВЕННО, по смыслу или теме относится к проверяемому пункту договора.\n"
             f"2. Если пункт договора касается оплаты, залога, выселения, ремонта или расторжения — В ЗАКОНЕ ПОЧТИ ВСЕГДА ЕСТЬ СООТВЕТСТВУЮЩАЯ СТАТЬЯ. Внимательно перечитай блок ЗАКОН.\n"
-            f"3. Указывай номер статьи ТОЛЬКО из предоставленного текста ЗАКОНА (например, 'Статья 544' или 'Статья 24').\n"
+            f"3. Указывай номер статьи ТОЛЬКО из предоставленного текста ЗАКОНА (например, 'Статья 36' или 'Статья 24').\n"
             f"4. СТРОГО ЗАПРЕЩЕНО придумывать номера статей, которых НЕТ в блоке ЗАКОН.\n"
             f"5. Пиши 'не найдено в предоставленном законе' ТОЛЬКО в самом крайнем случае, если в блоке ЗАКОН вообще нет ни одного упоминания этой темы.\n\n"
 
             f"ПРАВИЛА ДЛЯ 'mitigation':\n"
-            f"- Для категории 'risk' или для очевидно неадекватных условий/сумм — ОБЯЗАТЕЛЬНО предложи конкретную юридически корректную формулировку для исправления.\n"
+            f"- Для категории 'risk' или для очевидно неадекватных условий/сумм — ОБЯЗАТЕЛЬНО предложи конкретную юридически корректную формулировку для исправления (Протокол разногласий).\n"
             f"- Для остальных категорий — предложи улучшение текста договора.\n\n"
 
             f"ОГРАНИЧЕНИЕ ОБЛАСТИ:\n"
@@ -521,6 +522,42 @@ class DocumentProcessor:
         used_model = "smart" if user["tier"] == "premium" else "fast"
 
         return ai_service.generate_analysis(doc_text, used_model)
+    
+    def _validate(self, doc_text: str, findings: dict) -> dict:
+        if not findings or not isinstance(findings, dict):
+            return findings
+
+        # Normalize document
+        normalized_doc = re.sub(r'\s+', ' ', doc_text).strip().lower()
+
+        validated_findings = {}
+
+        # Find "excerpt" key for every finding
+        for key, value in findings.items():
+            if isinstance(value, list):
+                valid_items = []
+                for item in value:
+                    if isinstance(item, dict) and "excerpt" in item:
+                        excerpt = item.get("excerpt", "")
+
+                        if not excerpt:
+                            continue
+
+                        # Normalize excerpt
+                        normalized_excerpt = re.sub(r'\s+', ' ', excerpt).strip().lower()
+                        pattern = re.escape(normalized_excerpt)
+
+                        # Validate with RegEx
+                        if re.search(pattern, normalized_doc):
+                            valid_items.append(item)
+                        else:
+                            print(f" > [DocProcessor] Validator cut: {pattern}")
+
+                validated_findings[key] = valid_items
+            else:
+                validated_findings[key] = value
+
+        return validated_findings
 
     def analyze(self, text: str, user: dict) -> str:
         """ Main document analyze cycle """
@@ -533,10 +570,13 @@ class DocumentProcessor:
             ai_service = AIService(retriever)
 
             # Preprocess file
-            raw_dict = self._preprocess_file(ai_service, text)
+            censored_doc = self._preprocess_file(ai_service, text)
 
             # Analyze file
-            result = self._main_process(ai_service, user, raw_dict)
+            analytics = self._main_process(ai_service, user, censored_doc)
+
+            # Validate
+            result = self._validate(censored_doc, analytics)
 
             print(" > [DocProcessor] Analyze finished.")
             #print(f" > Final: {result}")
