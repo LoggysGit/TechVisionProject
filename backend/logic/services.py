@@ -441,7 +441,7 @@ class AIService:
 
         # Prepare prompts
         user_message = (
-            f"ЗАКОН (выдержка из статей):\n{law_context}\n\n"
+            f"ЗАКОН:\n{law_context}\n\n"
             f"ДОГОВОР:\n{document_text}\n\n---\n"
             f"Пройди договор пункт за пунктом. Для каждой выявленной проблемы/риска создай отдельный объект в 'findings'.\n\n"
             f"ПРАВИЛА ДЛЯ 'source' (КРИТИЧЕСКИ ВАЖНО):\n"
@@ -506,21 +506,21 @@ class DocumentProcessor:
     def __init__(self):
         print(" > [DocProcessor] Initted.")
 
-    def _preprocess_file(self, ai_service: AIService, file_text: str) -> dict:
+    def _preprocess_file(self, ai_service: AIService, file_text: str) -> str:
         print(" > [DocProcessor] Preprocessing file.")
 
         preprocessed = ai_service.censor(file_text)
 
-        print(f" > -------------- Result: {preprocessed} -------------- <")
+        #print(f" > -------------- Result: {preprocessed} -------------- <")
         print(" > [DocProcessor] Censoring done.")
         return {"content": preprocessed}
 
-    def _main_process(self, ai_service: AIService, user: dict, file_dict: dict) -> dict:
+    def _main_process(self, ai_service: AIService, user: dict, doc_text: str) -> str:
         print(" > [DocProcessor] Main process started.")
 
         used_model = "smart" if user["tier"] == "premium" else "fast"
 
-        return ai_service.generate_analysis(file_dict, used_model)
+        return ai_service.generate_analysis(doc_text, used_model)
 
     def analyze(self, text: str, user: dict) -> str:
         """ Main document analyze cycle """

@@ -1,8 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
-import { createWorker } from 'tesseract.js'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+
+import { createWorker } from 'tesseract.js'
 
 export class ExtractorService {
   async extractText(file) {
@@ -13,7 +14,7 @@ export class ExtractorService {
       return await this._extractFromPdf(file);
     }
 
-    if (fileType.startsWith('image/') || ['png', 'jpg', 'jpeg'].includes(extension)) {
+    if (['png', 'jpg', 'jpeg'].includes(extension)) {
       return await this._extractFromImage(file);
     }
 
@@ -26,6 +27,7 @@ export class ExtractorService {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
 
+    // Assemble full text
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
@@ -96,7 +98,7 @@ export class Anonymizer {
   }
 
   _replaceIdCard(text) {
-    return text.replace(this.patterns.idCard, (fullMatch, label, value) => {
+    return text.replace(this.patterns.idCard, (_, label, value) => {
       if (this.history.idCard[value]) {
         return `${label}[ID_${this.history.idCard[value]}]`;
       }
