@@ -91,6 +91,6 @@ MODEL_CONTEXT = 3120
 GROQ_KEY = env('GROQ_API_KEY')
 
 GROQ_MODELS = {
-    'fast': 'llama-3.1-8b-instant',
+    'fast': 'llama-3.3-70b-versatile',
     'smart': 'llama-3.3-70b-versatile'
 }

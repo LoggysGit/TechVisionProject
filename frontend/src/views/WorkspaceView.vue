@@ -5,7 +5,7 @@ import { unref, toRaw } from 'vue'
 import { ExtractorService, Anonymizer } from '../assets/censorer.js'
 
 import Header from '@/components/Header.vue'
-import Footer from '"@"/components/Footer.vue'
+import Footer from '@/components/Footer.vue'
 import Background from '@/components/Background.vue'
 
 import ReportModal from '@/components/ReportModal.vue'
@@ -13,14 +13,14 @@ import Notification from '@/components/Notification.vue'
 
 import BGImage from '../assets/images/bg_workspace.jpeg'
 
-// === Global section === //
+// === Global === //
 const backendAPI = 'http://127.0.0.1:8000/'
 
 const notifyRef = ref(null)
 
 const pastAnalyses = ref([])
 
-// === File select code section === //
+// === File selection === //
 const selectedFile = ref(null)
 const isDragging = ref(false)
 const fileInput = ref(null)
@@ -160,11 +160,6 @@ const isModalOpen = ref(false)
 
 const selectedReport = ref(null)
 
-function closeModal() {
-  isModalOpen.value = false
-  console.log(isModalOpen)
-}
-
 const targetName = ref('')
 
 async function submitAnalysis() {
@@ -174,11 +169,13 @@ async function submitAnalysis() {
 
   if (!file || !name) return
 
-  console.log(`[Censorer] File selected: ${file.name}`)
-  console.log(`[Target Name]: ${name}`)
+  console.log(`File selected: ${file.name}`)
+  console.log(`Target Name: ${name}`)
 
   const extractor = new ExtractorService()
   const anonymizer = new Anonymizer()
+
+  notifyRef.value?.show("Анализируем документ. Можете пока что переключиться на другую страницу, но не закрывайте эту.", 'info')
 
   try {
     isLoading.value = true
@@ -191,7 +188,7 @@ async function submitAnalysis() {
     const preprocessedText = `Человек, от лица которого необходимо рассматривать документ: ${name}.\nДОКУМЕНТ:\n${secureText}`
 
     // 2. Send
-    const response = null
+    let response = null
     try {
       response = await fetch(`${backendAPI}/api/analyze/`, {
       method: 'POST',
@@ -205,14 +202,14 @@ async function submitAnalysis() {
     })
     }
     catch{
-      throw new Error('Server does not responding.')
+      throw new Error('Сервер не отвечает (Возможно, выключен).')
     }
 
     if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`)
+      throw new Error(`Ошибка сервера (500): ${response.status}`)
     }
     const backendData = await response.json()
-    console.log('[Backend]:', backendData)
+    //console.log('[Backend]:', backendData)
 
     // 3. Get & Open Modal
     selectedReport.value = backendData
@@ -232,9 +229,15 @@ async function submitAnalysis() {
   }
 }
 
+// === Report modal window functions === //
 function selectReport(rep){
   selectedReport.value = rep.report;
   isModalOpen.value = true;
+}
+
+function closeModal() {
+  isModalOpen.value = false
+  console.log(isModalOpen)
 }
 
 // === UI Points === //
@@ -285,7 +288,6 @@ document.addEventListener("DOMContentLoaded", () => {
             @click="clearHistory"
             title="Очистить всю историю"
           >
-            <span class="clear-btn__icon">🗑️</span>
             <span class="clear-btn__text">Очистить историю</span>
           </button>
         </div>
@@ -376,7 +378,7 @@ document.addEventListener("DOMContentLoaded", () => {
       </section>
     </main>
 
-    <!-- Notification toast -->
+    <!-- Notification label -->
     <Notification ref="notifyRef" />
 
     <!-- Modal Window for Results -->
@@ -448,10 +450,6 @@ document.addEventListener("DOMContentLoaded", () => {
   border-color: var(--lime);
   color: var(--bg-deep);
   transform: translateY(-1px);
-}
-
-.clear-btn__icon {
-  font-size: 14px;
 }
 
 /* History list */
