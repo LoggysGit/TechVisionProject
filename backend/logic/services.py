@@ -23,7 +23,18 @@ class LawRetriever:
     """ Law index builder """
 
     def __init__(self):
-        print(" > [LawRetriever] Initted successgully.")
+        # Init objects
+        self.embedder = SentenceTransformer(settings.SEN_TRANSFORMER_MODEL, device='cpu')
+        self.db_client = chromadb.PersistentClient(path=settings.LAW_DB_PATH)
+
+        # Reload collection
+        try:
+            self.db_client.delete_collection("housing_law")
+        except Exception:
+            pass
+        self.collection = self.db_client.create_collection("housing_law")
+
+        print(" > [LawRetriever] Initted successfully.")
 
     def _compress_document(self, doc_text: str, query_embedding: list, max_chars: int = 800) -> str:
         """ Compresses document into vectors """
@@ -101,7 +112,7 @@ class LawRetriever:
 
         return"\n\n---\n\n".join(compressed)
 
-    # - Build law index function - #
+    # - Build law index function (static) - #
     @staticmethod
     def extract_law_text(pdf_path: str) -> str:
         """ Extracts law text from law PDF """
@@ -351,7 +362,7 @@ class AIService:
         
         # Prepare AI
         try:
-            system_prompt = self._get_system_prompt("sys_censor_prompt.txt")
+            system_prompt = self._get_system_prompt("sys_prompt_censor.txt")
 
             llm = self._get_local_llm()
             if llm is None:
@@ -500,6 +511,7 @@ class DocumentProcessor:
 
         preprocessed = ai_service.censor(file_text)
 
+        print(f" > -------------- Result: {preprocessed} -------------- <")
         print(" > [DocProcessor] Censoring done.")
         return {"content": preprocessed}
 
@@ -514,10 +526,6 @@ class DocumentProcessor:
         """ Main document analyze cycle """
 
         print(" > [DocProcessor] Analyze called.")
-
-        # Check all
-        if not settings.GROQ_KEY:
-            return ""
         
         try:
             # Init
