@@ -86,7 +86,7 @@ LAW_PDF_PATH = "..\\backend\\config\\law.pdf"
 CENSOR_MODEL = LOGIC_CONF_DIR / 'Qwen2.5.gguf'
 SEN_TRANSFORMER_MODEL = 'intfloat/multilingual-e5-small'
 
-MODEL_CONTEXT = 3120
+MODEL_CONTEXT = 4096
 
 GROQ_KEY = env('GROQ_API_KEY')
 
@@ -95,6 +95,6 @@ GROQ_MODELS = {
     'smart': 'llama-3.3-70b-versatile'
 }
 LAW_ARTICLES = {
-    'fast': 3,
-    'smart': 6
+    'fast': 4,
+    'smart': 7
 }

@@ -116,8 +116,6 @@ const emit = defineEmits(['close'])
 const parsedData = computed(() => {
   if (!props.reportData) return {}
 
-  console.log(props.reportData.title)
-
   let data = props.reportData.report
   if (typeof data.result === 'string') {
     try {
