@@ -4,7 +4,7 @@ djangorestframework
 django-cors-headers
 
 # Special system
-environ
+django-environ
 cryptography
 
 # OAuth
