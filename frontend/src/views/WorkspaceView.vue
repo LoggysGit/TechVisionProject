@@ -116,9 +116,9 @@ function saveAnalysis(title, result) {
       }
     }
 
-    // 4. Strip reactivity
+    // 4. Strip reactivity & Clean strings
     const cleanData = cloneCleanObject(parsedResult);
-    const cleanTitle = String(unref(title) || 'Contract Analysis');
+    const cleanTitle = String(unref(title) || 'Contract Analysis').replace(/\.(pdf|png|jpe?g)$/i, '');
 
     // 5. Get existing history from storage
     const historyRaw = localStorage.getItem('analysis_history') || '[]';
@@ -231,7 +231,7 @@ async function submitAnalysis() {
 
 // === Report modal window functions === //
 function selectReport(rep){
-  selectedReport.value = rep.report;
+  selectedReport.value = rep;
   isModalOpen.value = true;
 }
 
