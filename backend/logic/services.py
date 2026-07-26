@@ -33,7 +33,7 @@ class LawRetriever:
         print(" > [LawRetriever] Initted successfully.")
 
     def _compress_document(self, doc_text: str, query_embedding: list, max_chars: int = 800) -> str:
-        """ Compresses document into vectors """
+        """ Compresses document via embeddings """
 
         try:
             # Split document on part
@@ -48,7 +48,7 @@ class LawRetriever:
             if not sentences or len(doc_text) <= max_chars:
                 return doc_text
 
-            # Emded & score
+            # Embed & score
             sent_embeddings = self.embedder.encode(sentences, normalize_embeddings=True)
             query_vec = np.array(query_embedding)
             scores = sent_embeddings @ query_vec
