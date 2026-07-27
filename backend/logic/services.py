@@ -247,7 +247,7 @@ class AIService:
             "source": "статья закона, например 'Article 24, para 6' — обязательно, не оставлять пустым",
             "category": "одно из: responsibility | right | obligation | deadline | risk",
             "explanation": "что это значит для нанимателя простыми словами",
-            "mitigation": "как переформулировать пункт по закону"
+            "mitigation": "как переформулировать пункт по закону, или пустая строка если риска нет"
         }
         self.schema_str = json.dumps(self.finding_schema, ensure_ascii=False)
 
